@@ -1,0 +1,215 @@
+        -:    0:Source:Graph.cpp
+        -:    0:Graph:Graph.gcno
+        -:    0:Data:Graph.gcda
+        -:    0:Runs:9
+        -:    1:#include <iostream>
+        -:    2:#include "Graph.hpp"
+        -:    3:#include <stack>
+        -:    4:#include <string>
+        -:    5:#include <getopt.h>
+        -:    6:#include <stdexcept>
+        -:    7:#include <random>
+        -:    8:#include <iomanip> 
+        -:    9:
+        -:   10:static struct option long_options[] = {
+        -:   11:    {"vertecs",    required_argument, 0, 'v'},
+        -:   12:    {"edges",    required_argument, 0, 'e'},  
+        -:   13:    {"seed",    required_argument, 0, 's'},   
+        -:   14:    {0, 0, 0, 0}
+        -:   15:};
+        -:   16:
+        -:   17:
+        9:   18:Graph::Graph() : vertices(0), EdgesNum(0) {}
+        -:   19:
+        -:   20:
+        9:   21:void  Graph::parseFlags(int argc, char* argv[]) {
+        9:   22:    int e_num=-1,v_num=-1,seed=-1;
+        -:   23:    int opt;
+        -:   24: 
+       30:   25:    while ((opt = getopt_long(argc, argv, "v:e:s:", long_options, nullptr)) != -1) {
+        -:   26:        try{
+       24:   27:            switch (opt) {
+        9:   28:                    case 'v':
+       10:   29:                        v_num = std::stoi(optarg);
+       8*:   30:                        if (v_num < 0) throw std::invalid_argument("vertices must be positive");
+        8:   31:                        break;
+        7:   32:                    case 'e':
+        7:   33:                        e_num = std::stoi(optarg);
+       7*:   34:                        if (e_num < 0) throw std::invalid_argument("edges must be positive");
+        7:   35:                        break;
+        7:   36:                    case 's':
+        8:   37:                        seed = std::stoi(optarg);
+       6*:   38:                        if (seed <= 0) throw std::invalid_argument("seed must be positive");
+        6:   39:                        break;
+        1:   40:                    default:
+        -:   41:                        std::cerr << "Usage: " << argv[0]
+        1:   42:                                << " -v <Vertex Number> -e <Edge Number> -s <Seed>\n";
+        1:   43:                        exit(EXIT_FAILURE);
+        -:   44:                }
+        -:   45:
+        2:   46:        } catch (const std::invalid_argument& e) {
+        1:   47:            std::cerr << "Invalid argument for -" << (char)opt << ": not a number\n";
+        1:   48:            exit(EXIT_FAILURE);
+        1:   49:        } catch (const std::out_of_range& e) {
+        1:   50:            std::cerr << "Invalid argument for -" << (char)opt << ": number out of range\n";
+        1:   51:            exit(EXIT_FAILURE);
+    =====:   52:        }
+        -:   53:    }
+        6:   54:    if (v_num<0 || e_num<0 || seed<0) {
+        2:   55:        std::cerr << "Error: missing or invalid arguments\n";
+        -:   56:        std::cerr << "Usage: " << argv[0]
+        2:   57:                  << " -v <Vertect Number> -e <Edges Number> -s <Seed>\n";
+        2:   58:        exit(EXIT_FAILURE);
+        -:   59:    }
+        4:   60:    int max_edges= (v_num*(v_num-1))/2 ;
+        -:   61:
+        4:   62:    if(e_num>max_edges){
+        2:   63:        std::cerr << "Error: Too many edges\n";
+        2:   64:        exit(EXIT_FAILURE);
+        -:   65:    }
+        2:   66:    this->vertices = v_num;
+        2:   67:    this->EdgesNum = e_num;
+        4:   68:    this->adjMat.resize(v_num, std::vector<int>(v_num, inf));
+        -:   69:
+        2:   70:    CreateRandomGraph(v_num,e_num,seed);
+        2:   71:}
+        -:   72:
+        -:   73:
+        2:   74:void Graph::CreateRandomGraph(size_t v_num,size_t e_num, size_t seed){
+        2:   75:    std::vector<std::pair<int, int>> allEdges;
+       13:   76:    for (size_t u = 0; u < v_num; ++u) {
+       36:   77:        for (size_t v = u + 1; v < v_num; ++v) {
+       25:   78:        allEdges.emplace_back(u, v);
+        -:   79:        }
+        -:   80:    }
+        2:   81:    std::mt19937 gen(seed); 
+        2:   82:    std::shuffle(allEdges.begin(), allEdges.end(), gen);
+        -:   83:
+       27:   84:    for (size_t i = 0; i < e_num && i<allEdges.size(); ++i) {
+       25:   85:        int u = allEdges[i].first;
+       25:   86:        int v = allEdges[i].second;
+       25:   87:        std::cout<<"( "<<u<<" , "<<v<<" ) "<<std::endl;
+       25:   88:        adjMat[u][v] = 1;
+       25:   89:        adjMat[v][u] = 1;
+        -:   90:    }
+        2:   91:     printGraph();
+        2:   92:}
+        -:   93:
+        -:   94:
+        -:   95:
+        2:   96:void Graph::printGraph() {
+        2:   97:    std::cout << "    ";
+       13:   98:    for (int j = 0; j < vertices; ++j) {
+       11:   99:        std::cout << std::setw(4) << j;
+        -:  100:    }
+        2:  101:    std::cout << "\n";
+        -:  102:
+        2:  103:    std::cout << "    ";
+       13:  104:    for (int j = 0; j < vertices; ++j) {
+       11:  105:        std::cout << "----";
+        -:  106:    }
+        2:  107:    std::cout << "\n";
+        -:  108:
+       13:  109:    for (int i = 0; i < vertices; ++i) {
+       11:  110:        std::cout << std::setw(2) << i << " |";
+       72:  111:        for (int j = 0; j < vertices; ++j) {
+       61:  112:            if (adjMat[i][j] == inf)
+       11:  113:                std::cout << std::setw(4) << "inf";
+        -:  114:            else
+       50:  115:                std::cout << std::setw(4) << adjMat[i][j];
+        -:  116:        }
+       11:  117:        std::cout << "\n";
+        -:  118:    }
+        2:  119:}
+        -:  120:
+        -:  121:
+        2:  122:  bool Graph::EvenDeg(){
+        -:  123:    int counter;
+        7:  124:    for(int i=0 ; i<vertices ;i++){
+        6:  125:        counter=0;
+       37:  126:        for (int j=0; j<vertices ;j++){
+       31:  127:            if(adjMat[i][j]==1){
+       25:  128:                counter++;
+        -:  129:            }
+        -:  130:        }
+        6:  131:        if(counter%2==1){
+        1:  132:            std::cerr << "Graph is not Eulerian: vertex " << i << " has odd degree\n";
+        1:  133:            return false;
+        -:  134:        }
+        -:  135:    }
+        1:  136:    return true;
+        -:  137:  }
+        -:  138:
+        -:  139:
+        5:  140:void dfs(int u, const std::vector<std::vector<int>>& adj, std::vector<bool>& visited) {
+        5:  141:    visited[u] = true;
+       30:  142:    for (size_t v = 0; v < adj.size(); ++v) {
+       25:  143:        if (adj[u][v] == 1 && !visited[v])
+        4:  144:            dfs(v, adj, visited);
+        -:  145:    }
+        5:  146:}
+        -:  147:
+        1:  148:bool isConnected(const std::vector<std::vector<int>>& adj) {
+        1:  149:    int n = adj.size();
+        1:  150:    std::vector<bool> visited(n, false);
+        1:  151:    int start = -1;
+       1*:  152:    for (int i = 0; i < n; ++i) {
+        1:  153:        int degree = 0;
+        6:  154:        for (int j = 0; j < n; ++j)
+        5:  155:            if (adj[i][j] == 1) degree++;
+        1:  156:        if (degree > 0) {
+        1:  157:            start = i;
+        1:  158:            break;
+        -:  159:        }
+        -:  160:    }
+        1:  161:    if (start == -1)
+    #####:  162:        return true; 
+        -:  163:
+        1:  164:    dfs(start, adj, visited);
+        6:  165:    for (int i = 0; i < n; ++i) {
+        5:  166:        int degree = 0;
+       30:  167:        for (int j = 0; j < n; ++j)
+       25:  168:            if (adj[i][j] == 1) degree++;
+       5*:  169:        if (degree > 0 && !visited[i]){
+    #####:  170:            std::cerr << "Graph is not connected: vertex " << i << " is not reachable from vertex " << start << "\n";   
+    #####:  171:            return false;
+        -:  172:        }
+        -:  173:    }
+        1:  174:    return true;
+        1:  175:}
+        -:  176:
+        -:  177:
+        -:  178:
+        2:  179:bool Graph::EulerianCycle(std::vector<int>& euler){
+        2:  180:    if(!EvenDeg()|| !isConnected(adjMat)){
+        1:  181:        return false;
+        -:  182:    }
+        1:  183:    std::stack<int> path;
+        1:  184:    std::vector<std::vector<int>> copyMat=this->adjMat;
+        1:  185:    int source=0;
+        1:  186:    path.push(source);//start from 0 - positiv and even deg
+        -:  187:   
+       22:  188:    while(!path.empty()){
+       21:  189:        int u=path.top();
+       21:  190:        bool found=false;
+       96:  191:        for(int i =0; i<vertices; i++ ){
+       85:  192:            if(copyMat[u][i]==1){
+       10:  193:                path.push(i);
+       10:  194:                found=true;
+       10:  195:                copyMat[u][i]=inf;
+       10:  196:                copyMat[i][u]=inf;
+       10:  197:                break;
+        -:  198:            }
+        -:  199:        }
+       21:  200:       if (!found) {
+       11:  201:            euler.push_back(u);
+       11:  202:            path.pop();
+        -:  203:        }
+        -:  204:    }
+        1:  205:    std::reverse(euler.begin(), euler.end());
+        1:  206:    return true;
+        1:  207:  }
+        -:  208:
+        2:  209:Graph::~Graph() {
+        -:  210:    // Destructor
+        2:  211:}

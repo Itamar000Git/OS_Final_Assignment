@@ -1,0 +1,28 @@
+        -:    0:Source:main.cpp
+        -:    0:Graph:main.gcno
+        -:    0:Data:main.gcda
+        -:    0:Runs:2
+        -:    1:#include "Graph.hpp"
+        -:    2:#include <string>
+        -:    3:#include <getopt.h>
+        -:    4:
+        -:    5:
+        -:    6:
+        -:    7:
+        -:    8:
+        -:    9:
+        2:   10:int main(int argc, char* argv[]) {
+        2:   11:    Graph g;
+        2:   12:    g.parseFlags(argc,argv);
+        2:   13:    std::vector<int> euler;
+        2:   14:    if (g.EulerianCycle(euler)) {
+        1:   15:        std::cout << "Eulerian Cycle exists:\n";
+       12:   16:        for (int v : euler) {
+       11:   17:            std::cout << v << " -> ";
+        -:   18:        }
+        1:   19:        std::cout << "\n";
+        -:   20:    } else {
+        1:   21:        std::cout << "No Eulerian Cycle exists.\n";
+        -:   22:    }
+        2:   23:    return 0;
+        2:   24:}
