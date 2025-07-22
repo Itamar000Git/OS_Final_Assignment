@@ -9,7 +9,11 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
-
+#include <algorithm>
+#include "Algorithms.hpp"
+#include "MST.hpp"
+#include "Strategy.hpp"
+#include "Factory.hpp"
 
 Graph::Graph() : vertices(0), EdgesNum(0) {}
 
@@ -95,12 +99,33 @@ void run_server(int port_tcp, Graph& g) {
             
         }
 
-        for (int i = 0; i < FD_SETSIZE; i++) {
+        for (int i = 0; i < FD_SETSIZE; i++) {////////////////////////////////////////////////////
             sd = client_socket[i];
             if (sd > 0 && FD_ISSET(sd, &readfds)) {
-                // First read the matrix size (number of vertices)
+
+                
+                int alg_len = 0;
+                size_t received = recv(sd, &alg_len, sizeof(alg_len), MSG_WAITALL);
+                if (received != sizeof(alg_len)) {
+                    std::cerr << "Failed to receive algorithm length\n";
+                    close(sd);
+                    client_socket[i] = 0;
+                    continue;
+                }
+                //Read the algorithm type
+                std::vector<char> alg_buf(alg_len);
+                received = recv(sd, alg_buf.data(), alg_len, MSG_WAITALL);
+
+                if (received != alg_len) {
+                    std::cerr << "Failed to receive algorithm type\n";
+                    close(sd);
+                    client_socket[i] = 0;
+                    continue;
+                }
+                std::string alg(alg_buf.begin(), alg_buf.end());
+                //Read the matrix size (number of vertices)
                 int n = 0;
-                size_t received = recv(sd, &n, sizeof(n), MSG_WAITALL);// Read the size of the matrix
+                received = recv(sd, &n, sizeof(n), MSG_WAITALL);// Read the size of the matrix
                 if (received != sizeof(n)) {
                     std::cerr << "Failed to receive matrix size\n";
                     close(sd);
@@ -123,7 +148,23 @@ void run_server(int port_tcp, Graph& g) {
                     g.parseFromMatrix(newMatrix);
                     std::cout << "Graph updated.\n";
                     g.printGraph();
-                    CheckForEulerianCycle(g, sd);
+
+                    Strategy stra; //create a Strategy object
+                    // Create the algorithm object using the factory
+                    Algorithms* algObj = AlgorithmFactory::createAlgorithm(alg);
+
+                    stra.setStrategy(algObj); // Set the strategy with the created algorithm
+                    std::string result = stra.execute(g);// Execute the strategy on the graph
+
+                    if (send(sd, result.c_str(), result.size(), 0) < 0) { // Send the result back to the client
+                        std::cerr << "Failed to send result to client\n";
+                        close(sd);
+                        client_socket[i] = 0;
+                        continue;
+                    }
+                    std::cout << "Result sent to client." << std::endl;
+                  
+    
                 }
                 else{
                     close(sd);
@@ -147,29 +188,6 @@ void run_server(int port_tcp, Graph& g) {
 }
 
 
-void CheckForEulerianCycle(Graph& g, int socket_fd){
-    std::vector<int> euler;
-    std::string result;
-    if (g.EulerianCycle(euler)) {
-        std::cout << "Eulerian Cycle exists:\n";
-        result = "Eulerian Cycle exists:\n";
-        for (int v : euler) {
-            std::cout << v << " -> ";
-            result += std::to_string(v) + " -> ";
-        }
-        std::cout << "\n";
-        result += "\n";
-        
-    } else {
-        result = "No Eulerian Cycle exists.\n";
-        std::cout << "No Eulerian Cycle exists.\n";
-    }
-    
-    send(socket_fd, result.c_str(), result.size(), 0);
-}
-
-
- 
 
 void Graph::printGraph() {
     std::cout << "    ";
@@ -197,100 +215,44 @@ void Graph::printGraph() {
 }
 
 
-bool Graph::EvenDeg(){
-    int counter;
-    for(int i=0 ; i<vertices ;i++){
-        counter=0;
-        for (int j=0; j<vertices ;j++){
-            if(adjMat[i][j]==1){
-                counter++;
-            }
-        }
-        if(counter%2==1){
-            std::cerr << "Graph is not Eulerian: vertex " << i << " has odd degree\n";
-            return false;
-        }
-    }
-    return true;
-  }
+// void dfs(int u, const std::vector<std::vector<int>>& adj, std::vector<bool>& visited) {
+//     visited[u] = true;
+//     for (size_t v = 0; v < adj.size(); ++v) {
+//         if (adj[u][v] == 1 && !visited[v])
+//             dfs(v, adj, visited);
+//     }
+// }
+
+// bool isConnected(const std::vector<std::vector<int>>& adj) {
+//     int n = adj.size();
+//     std::vector<bool> visited(n, false);
+//     int start = -1;
+//     for (int i = 0; i < n; ++i) {
+//         int degree = 0;
+//         for (int j = 0; j < n; ++j)
+//             if (adj[i][j] == 1) degree++;
+//         if (degree > 0) {
+//             start = i;
+//             break;
+//         }
+//     }
+//     if (start == -1)
+//         return true; 
+
+//     dfs(start, adj, visited);
+//     for (int i = 0; i < n; ++i) {
+//         int degree = 0;
+//         for (int j = 0; j < n; ++j)
+//             if (adj[i][j] == 1) degree++;
+//         if (degree > 0 && !visited[i]){
+//             std::cerr << "Graph is not connected: vertex " << i << " is not reachable from vertex " << start << "\n";   
+//             return false;
+//         }
+//     }
+//     return true;
+// }
 
 
-void dfs(int u, const std::vector<std::vector<int>>& adj, std::vector<bool>& visited) {
-    visited[u] = true;
-    for (size_t v = 0; v < adj.size(); ++v) {
-        if (adj[u][v] == 1 && !visited[v])
-            dfs(v, adj, visited);
-    }
-}
-
-bool isConnected(const std::vector<std::vector<int>>& adj) {
-    int n = adj.size();
-    std::vector<bool> visited(n, false);
-    int start = -1;
-    for (int i = 0; i < n; ++i) {
-        int degree = 0;
-        for (int j = 0; j < n; ++j)
-            if (adj[i][j] == 1) degree++;
-        if (degree > 0) {
-            start = i;
-            break;
-        }
-    }
-    if (start == -1)
-        return true; 
-
-    dfs(start, adj, visited);
-    for (int i = 0; i < n; ++i) {
-        int degree = 0;
-        for (int j = 0; j < n; ++j)
-            if (adj[i][j] == 1) degree++;
-        if (degree > 0 && !visited[i]){
-            std::cerr << "Graph is not connected: vertex " << i << " is not reachable from vertex " << start << "\n";   
-            return false;
-        }
-    }
-    return true;
-}
-
-
-
-bool Graph::EulerianCycle(std::vector<int>& euler){
-    if(!EvenDeg()|| !isConnected(adjMat)){
-        return false;
-    }
-    if(EdgesNum==0){
-        std::cerr << "Graph has no edges, The eulerian cycle is empy cycle.\n";
-        return false;
-    }
-    std::stack<int> path;
-    std::vector<std::vector<int>> copyMat=this->adjMat;
-    int source=0;
-    path.push(source);//start from 0 - positiv and even deg
-   
-    while(!path.empty()){
-        int u=path.top();
-        bool found=false;
-        for(int i =0; i<vertices; i++ ){
-            if(copyMat[u][i]==1){
-                path.push(i);
-                found=true;
-                copyMat[u][i]=inf;
-                copyMat[i][u]=inf;
-                break;
-            }
-        }
-       if (!found) {
-            euler.push_back(u);
-            path.pop();
-        }
-    }
-    std::reverse(euler.begin(), euler.end());
-    return true;
-  }
-
-Graph::~Graph() {
-    // Destructor
-}
 
 void Graph::parseFromMatrix(const std::vector<std::vector<int>>& matrix) {
     this->vertices = matrix.size();
