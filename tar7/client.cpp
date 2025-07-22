@@ -190,20 +190,28 @@ int main(int argc, char* argv[]) {
         std::cout << "Adjacency matrix sent to server." << std::endl;
         std::cout << "Asked for " << input << "." << std::endl;
 
-        // Wait for server response
-        char buffer[1024];
-        ssize_t bytes_received = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
-        if (bytes_received > 0) {
-            buffer[bytes_received] = '\0'; // Null-terminate the received data
-            std::cout << "Server response: " << buffer << std::endl;
-        }
-        else if (bytes_received < 0) {
-            std::cerr << "Error receiving response from server." << std::endl;
+        // Step 1: קבלת אורך ההודעה
+        int msg_len = 0;
+        ssize_t bytes_received = recv(sockfd, &msg_len, sizeof(msg_len), MSG_WAITALL);
+        if (bytes_received != sizeof(msg_len)) {
+            std::cerr << "Error receiving message length from server." << std::endl;
             close(sockfd);
             return 1;
-        } else {
-            std::cout << "Server closed the connection." << std::endl;
         }
+
+        // Step 2: קבלת תוכן ההודעה באורך msg_len
+        std::vector<char> buffer(msg_len + 1); // +1 ל־null-terminator
+        bytes_received = recv(sockfd, buffer.data(), msg_len, MSG_WAITALL);
+        if (bytes_received != msg_len) {
+            std::cerr << "Error receiving full message from server." << std::endl;
+            close(sockfd);
+            return 1;
+        }
+
+        // Null-terminate and print
+        buffer[msg_len] = '\0';
+        std::cout << "Server response: " << buffer.data() << std::endl;
+
     }
     // Close the socket
     close(sockfd);

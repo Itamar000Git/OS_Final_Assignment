@@ -2,11 +2,11 @@
 C = g++
 CFLAGS = -c -g -Wall --coverage
 COVERAGE_DIR = coverage_files
-OBJECTS1 = Graph.o MST.o MaxFlow.o
+OBJECTS1 = Graph.o MST.o MaxFlow.o PathCover.o SCC.o
 OBJECTS2 = client.o
 TARGET1 = server
 TARGET2 = client
-HEADERS = Graph.hpp Algorithms.hpp Strategy.hpp Factory.hpp MST.hpp MaxFlow.hpp
+HEADERS = Graph.hpp Algorithms.hpp Strategy.hpp Factory.hpp MST.hpp MaxFlow.hpp PathCover.hpp SCC.hpp
 
 VALGRIND_MEMCHECK = valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all
 VALGRIND_CALLGRIND = valgrind --tool=callgrind
@@ -30,6 +30,12 @@ MST.o: MST.cpp $(HEADERS)
 
 MaxFlow.o: MaxFlow.cpp $(HEADERS)
 	$(C) $(CFLAGS) MaxFlow.cpp -o MaxFlow.o
+
+PathCover.o: PathCover.cpp $(HEADERS)
+	$(C) $(CFLAGS) PathCover.cpp -o PathCover.o
+
+SCC.o: SCC.cpp $(HEADERS)
+	$(C) $(CFLAGS) SCC.cpp -o SCC.o
 
 .PHONY: clean all coverage
 

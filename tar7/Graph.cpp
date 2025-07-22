@@ -154,15 +154,27 @@ void run_server(int port_tcp, Graph& g) {
                     Algorithms* algObj = AlgorithmFactory::createAlgorithm(alg);
 
                     stra.setStrategy(algObj); // Set the strategy with the created algorithm
-                    std::string result = stra.execute(g);// Execute the strategy on the graph
 
-                    if (send(sd, result.c_str(), result.size(), 0) < 0) { // Send the result back to the client
-                        std::cerr << "Failed to send result to client\n";
-                        close(sd);
-                        client_socket[i] = 0;
-                        continue;
-                    }
-                    std::cout << "Result sent to client." << std::endl;
+                  std::string result = stra.execute(g);
+
+         
+                int result_len = result.size();
+                if (send(sd, &result_len, sizeof(result_len), 0) < 0) {
+                    std::cerr << "Failed to send result length\n";
+                    close(sd);
+                    client_socket[i] = 0;
+                    continue;
+                }
+
+              
+                if (send(sd, result.c_str(), result_len, 0) < 0) {
+                    std::cerr << "Failed to send result to client\n";
+                    close(sd);
+                    client_socket[i] = 0;
+                    continue;
+                }
+                std::cout << "Result sent to client." << std::endl;
+
                   
     
                 }
