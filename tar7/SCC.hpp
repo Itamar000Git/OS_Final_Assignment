@@ -3,13 +3,16 @@
 
 #include "Algorithms.hpp"
 #include "Graph.hpp"
-#include <string>
 #include <vector>
+#include <string>
 
 class SCC : public Algorithms {
 public:
-    std::string activate(Graph& g)override;
-    std::vector<int> findSCC(Graph& g);
+    ~SCC() = default;
+
+    std::string activate(Graph& g) override;
+
+    std::vector<std::vector<int>> findSCC(Graph& g);
 };
 
-#endif
+#endif // SCC_HPP

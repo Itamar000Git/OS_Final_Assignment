@@ -104,28 +104,28 @@ void run_server(int port_tcp, Graph& g) {
             if (sd > 0 && FD_ISSET(sd, &readfds)) {
 
                 
-                int alg_len = 0;
-                size_t received = recv(sd, &alg_len, sizeof(alg_len), MSG_WAITALL);
-                if (received != sizeof(alg_len)) {
-                    std::cerr << "Failed to receive algorithm length\n";
-                    close(sd);
-                    client_socket[i] = 0;
-                    continue;
-                }
-                //Read the algorithm type
-                std::vector<char> alg_buf(alg_len);
-                received = recv(sd, alg_buf.data(), alg_len, MSG_WAITALL);
+                // int alg_len = 0;
+                // size_t received = recv(sd, &alg_len, sizeof(alg_len), MSG_WAITALL);
+                // if (received != sizeof(alg_len)) {
+                //     std::cerr << "Failed to receive algorithm length\n";
+                //     close(sd);
+                //     client_socket[i] = 0;
+                //     continue;
+                // }
+                // //Read the algorithm type
+                // std::vector<char> alg_buf(alg_len);
+                // received = recv(sd, alg_buf.data(), alg_len, MSG_WAITALL);
 
-                if (received != alg_len) {
-                    std::cerr << "Failed to receive algorithm type\n";
-                    close(sd);
-                    client_socket[i] = 0;
-                    continue;
-                }
-                std::string alg(alg_buf.begin(), alg_buf.end());
+                // if (received != alg_len) {
+                //     std::cerr << "Failed to receive algorithm type\n";
+                //     close(sd);
+                //     client_socket[i] = 0;
+                //     continue;
+                // }
+                // std::string alg(alg_buf.begin(), alg_buf.end());
                 //Read the matrix size (number of vertices)
                 int n = 0;
-                received = recv(sd, &n, sizeof(n), MSG_WAITALL);// Read the size of the matrix
+                size_t received = recv(sd, &n, sizeof(n), MSG_WAITALL);// Read the size of the matrix
                 if (received != sizeof(n)) {
                     std::cerr << "Failed to receive matrix size\n";
                     close(sd);
@@ -149,12 +149,24 @@ void run_server(int port_tcp, Graph& g) {
                     std::cout << "Graph updated.\n";
                     g.printGraph();
 
-                    Strategy stra; //create a Strategy object
-                    // Create the algorithm object using the factory
-                    Algorithms* algObj = AlgorithmFactory::createAlgorithm(alg);
+                    Strategy mst_stra; 
+                    Algorithms* mst_alg = AlgorithmFactory::createAlgorithm("MST");
+                    mst_stra.setStrategy(mst_alg); // Set the strategy with the created algorithm
 
-                    stra.setStrategy(algObj); // Set the strategy with the created algorithm
-                  std::string result = stra.execute(g);
+                    Strategy maxFlow_stra; 
+                    Algorithms* maxFlow_alg = AlgorithmFactory::createAlgorithm("MaxFlow");
+                    maxFlow_stra.setStrategy(maxFlow_alg); // Set the strategy with the created algorithm
+
+                    Strategy PathCover_stra; 
+                    Algorithms* PathCover_alg = AlgorithmFactory::createAlgorithm("PathCover");
+                    PathCover_stra.setStrategy(PathCover_alg); // Set the strategy with the created algorithm
+
+                    Strategy SCC_stra; 
+                    Algorithms* SCC_alg = AlgorithmFactory::createAlgorithm("SCC");
+                    SCC_stra.setStrategy(SCC_alg); // Set the strategy with the created algorithm
+
+                  
+                std::string result = stra.execute(g); /////need to add threads////////////////////////////////////////
 
                 int result_len = result.size();
                 if (send(sd, &result_len, sizeof(result_len), 0) < 0) {

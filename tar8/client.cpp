@@ -11,18 +11,17 @@
 
 int inf= std::numeric_limits<int>::max();
 
-bool sendMatrix(int sockfd, const std::vector<std::vector<int>>& adjMat,
-                std::string& input) {
+bool sendMatrix(int sockfd, const std::vector<std::vector<int>>& adjMat) {
     int n = adjMat.size();
-    int alg_len = input.size();
-    if (send(sockfd, &alg_len, sizeof(alg_len), 0) < 0) {
-        std::cerr << "Failed to send algorithm type length\n";
-        return false;
-    }
-    if (send(sockfd, input.c_str(), input.size(), 0) < 0) {
-        std::cerr << "Failed to send algorithm type\n";
-        return false;
-    }
+    // int alg_len = input.size();
+    // if (send(sockfd, &alg_len, sizeof(alg_len), 0) < 0) {
+    //     std::cerr << "Failed to send algorithm type length\n";
+    //     return false;
+    // }
+    // if (send(sockfd, input.c_str(), input.size(), 0) < 0) {
+    //     std::cerr << "Failed to send algorithm type\n";
+    //     return false;
+    // }
 
     if (send(sockfd, &n, sizeof(n), 0) < 0) {
         std::cerr << "Failed to send matrix size\n";
@@ -120,7 +119,7 @@ int main(int argc, char* argv[]) {
             std::cout << "Exiting client..." << std::endl;
             break;
         }
-        if (choice != 1) {
+        if (choice != 1 ) {
             std::cout << "Invalid choice. Please try again." << std::endl;
             std::cin.clear(); // Clear error state
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Discard invalid input
@@ -135,6 +134,7 @@ int main(int argc, char* argv[]) {
             close(sockfd);
             return 1;
         }
+
         adjMat.clear();
         adjMat.resize(vertices, std::vector<int>(vertices,inf ));
         std::cout << "Enter adjacency matrix :" << std::endl;
@@ -153,50 +153,50 @@ int main(int argc, char* argv[]) {
         }
 
 
-        std::cout<<"Enter your Algorithem choice:"<<std::endl;
-        std::cout << "1. MST" << std::endl;
-        std::cout << "2. Max Flow" << std::endl;
-        std::cout << "3. Path Cover" << std::endl;
-        std::cout << "4. SCC" << std::endl;
-        std::cout << "5. Exit" << std::endl;
-        int client_choice;
-        std::string input;
-        std::cin >> client_choice;
-        switch (client_choice) {
-            case 1:
-                std::cout << "MST algorithm selected." << std::endl;
-                input = "MST";
-                break;
-            case 2:
-                std::cout << "Max Flow algorithm selected." << std::endl;
-                input = "MaxFlow";
-                break;
-            case 3:
-                std::cout << "Path Cover algorithm selected." << std::endl;
-                input = "PathCover";
-                break;
-            case 4:
-                std::cout << "SCC algorithm selected." << std::endl;
-                input = "SCC";
-                break;
-            case 5:
-                std::cout << "Exiting client..." << std::endl;
-                close(sockfd);
-                return 0;
-            default:
-                std::cerr << "Invalid choice. Please try again." << std::endl;
-                continue; // Skip sending matrix if choice is invalid
-        }
+        // std::cout<<"Enter your Algorithem choice:"<<std::endl;
+        // std::cout << "1. MST" << std::endl;
+        // std::cout << "2. Max Flow" << std::endl;
+        // std::cout << "3. Path Cover" << std::endl;
+        // std::cout << "4. SCC" << std::endl;
+        // std::cout << "5. Exit" << std::endl;
+        // int client_choice;
+        // std::string input;
+        // std::cin >> client_choice;
+        // switch (client_choice) {
+        //     case 1:
+        //         std::cout << "MST algorithm selected." << std::endl;
+        //         input = "MST";
+        //         break;
+        //     case 2:
+        //         std::cout << "Max Flow algorithm selected." << std::endl;
+        //         input = "MaxFlow";
+        //         break;
+        //     case 3:
+        //         std::cout << "Path Cover algorithm selected." << std::endl;
+        //         input = "PathCover";
+        //         break;
+        //     case 4:
+        //         std::cout << "SCC algorithm selected." << std::endl;
+        //         input = "SCC";
+        //         break;
+        //     case 5:
+        //         std::cout << "Exiting client..." << std::endl;
+        //         close(sockfd);
+        //         return 0;
+        //     default:
+        //         std::cerr << "Invalid choice. Please try again." << std::endl;
+        //         continue; // Skip sending matrix if choice is invalid
+        // }
         // Send the adjacency matrix to the server
-        if (!sendMatrix(sockfd, adjMat, input)) {
+        if (!sendMatrix(sockfd, adjMat)) {
             std::cerr << "Failed to send adjacency matrix to server." << std::endl;
             close(sockfd);
             return 1;
         }
         std::cout << "Adjacency matrix sent to server." << std::endl;
-        std::cout << "Asked for " << input << "." << std::endl;
+        //std::cout << "Asked for " << input << "." << std::endl;
 
-       
+      ////////////////////////maybe need 4 times loop
         int msg_len = 0;
         ssize_t bytes_received = recv(sockfd, &msg_len, sizeof(msg_len), MSG_WAITALL);
         if (bytes_received != sizeof(msg_len)) {
@@ -216,7 +216,7 @@ int main(int argc, char* argv[]) {
         // Null-terminate and print
         buffer[msg_len] = '\0';
         std::cout << "Server response: " << buffer.data() << std::endl;
-
+///////////////////////////////////////////////////////////////////////////////
     }
     // Close the socket
     close(sockfd);

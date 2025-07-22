@@ -12,6 +12,10 @@ public:
     ~PathCover()=default;
 
     std::string activate(Graph& g)override {
+
+        if (g.hasSelfLoops()) {
+            return "Graph contains self-loops, Path Cover cannot be computed";
+        }
         std::vector<std::vector<int>> paths;
         int count = findPathCover(g, paths);
         std::ostringstream oss;
@@ -24,6 +28,7 @@ public:
             }
             oss << "\n";
         }
+        std::cout <<"The path cover is:\n" <<oss.str()<< std::endl;
         return oss.str();
     }
     int findPathCover(Graph &g, std::vector<std::vector<int>>& allPaths);

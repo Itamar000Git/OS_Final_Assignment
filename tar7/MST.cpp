@@ -58,6 +58,5 @@ int MST::culcMST(Graph &g) {
         std::cerr << "Graph is not connected, MST does not exist\n";
         return -1;
     }
-    std::cout << "MST weight: " << mst_weight << std::endl;
     return mst_weight;
 }
