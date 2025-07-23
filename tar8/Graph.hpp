@@ -16,11 +16,12 @@ int const inf = std::numeric_limits<int>::max();
 
 
 class Graph {
-    private:
-    int vertices;
-    int EdgesNum;
+   
+  
 
 public:
+    int vertices;
+    int EdgesNum;
     std::vector<std::vector<int>> adjMat; // adjacency matrix representation
     Graph();
     ~Graph()=default;

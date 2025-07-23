@@ -13,28 +13,50 @@ int inf= std::numeric_limits<int>::max();
 
 bool sendMatrix(int sockfd, const std::vector<std::vector<int>>& adjMat) {
     int n = adjMat.size();
-    // int alg_len = input.size();
-    // if (send(sockfd, &alg_len, sizeof(alg_len), 0) < 0) {
-    //     std::cerr << "Failed to send algorithm type length\n";
-    //     return false;
-    // }
-    // if (send(sockfd, input.c_str(), input.size(), 0) < 0) {
-    //     std::cerr << "Failed to send algorithm type\n";
-    //     return false;
-    // }
+    std::string type = "matrix";
 
+ 
+    char type_buf[16] = {0};
+    std::memcpy(type_buf, type.c_str(), std::min(type.size(), sizeof(type_buf)-1));
+
+    if (send(sockfd, type_buf, sizeof(type_buf), 0) < 0) {
+        std::cout << "Failed to send matrix type\n";
+        return false;
+    }
+   
     if (send(sockfd, &n, sizeof(n), 0) < 0) {
-        std::cerr << "Failed to send matrix size\n";
+        std::cout << "Failed to send matrix size\n";
         return false;
     }
 
     for (int i = 0; i < n; ++i) {
         if (send(sockfd, adjMat[i].data(), n * sizeof(int), 0) < 0) {
-            std::cerr << "Failed to send matrix row " << i << "\n";
+            std::cout << "Failed to send matrix row " << i << "\n";
             return false;
         }
     }
 
+    return true;
+}
+
+bool sendRandom(int sockfd, int vertices, int edges){
+    int n = vertices;
+    size_t e = static_cast<size_t>(edges);
+    std::string type = "random";
+    std::cout << "Sending random graph with " << n << " vertices and " << e << " edges." << std::endl;
+
+    if (send(sockfd, type.c_str(), 16, 0) < 0) {
+        std::cout << "Failed to send random graph type\n";
+        return false;
+    }
+    if (send(sockfd, &n, sizeof(n), 0) < 0) {
+        std::cout << "Failed to send vertices size\n";
+        return false;
+    }
+    if (send(sockfd, &e, sizeof(e), 0) < 0) {
+        std::cout << "Failed to send edges size\n";
+        return false;
+    }
     return true;
 }
 
@@ -78,6 +100,7 @@ int main(int argc, char* argv[]) {
     }
 
     int vertices;
+    int edgesNum;
     std::vector<std::vector<int>> adjMat;
     int sockfd = -1;
  // Resolve hostname
@@ -112,14 +135,15 @@ int main(int argc, char* argv[]) {
     while(true){
         std::cout<<"Enter your choice:"<<std::endl;
         std::cout << "1. Send adjacency matrix to server" << std::endl;
-        std::cout << "2. Exit" << std::endl;
+        std::cout << "2. Choose a random graph" << std::endl;
+        std::cout << "3. Exit" << std::endl;
         int choice;
         std::cin >> choice;
-        if (choice == 2) {
+        if (choice == 3) {
             std::cout << "Exiting client..." << std::endl;
             break;
         }
-        if (choice != 1 ) {
+        if (choice != 1 && choice != 2) {
             std::cout << "Invalid choice. Please try again." << std::endl;
             std::cin.clear(); // Clear error state
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Discard invalid input
@@ -135,66 +159,46 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
-        adjMat.clear();
-        adjMat.resize(vertices, std::vector<int>(vertices,inf ));
-        std::cout << "Enter adjacency matrix :" << std::endl;
-        // Read adjacency matrix from standard input
-        for (int i = 0; i < vertices; ++i) {
-            for (int j = 0; j < vertices; ++j) {
-                std::cin >> adjMat[i][j];
-                if (adjMat[i][j] < 0) {
-                    std::cerr << "Error: Adjacency matrix must contain non negativ number." << std::endl;
-                    close(sockfd);
-                    return 1;
+        if(choice == 1){
+            adjMat.clear();
+            adjMat.resize(vertices, std::vector<int>(vertices,inf ));
+            std::cout << "Enter adjacency matrix :" << std::endl;
+            // Read adjacency matrix from standard input
+            for (int i = 0; i < vertices; ++i) {
+                for (int j = 0; j < vertices; ++j) {
+                    std::cin >> adjMat[i][j];
+                    if (adjMat[i][j] < 0) {
+                        std::cerr << "Error: Adjacency matrix must contain non negativ number." << std::endl;
+                        close(sockfd);
+                        return 1;
 
+                }
+
+                }
             }
-
+            // Send the adjacency matrix to the server
+            if (!sendMatrix(sockfd, adjMat)) {
+                std::cout << "Failed to send adjacency matrix to server." << std::endl;
+                close(sockfd);
+                return 1;
+            }
+            std::cout << "Adjacency matrix sent to server." << std::endl;
+        }
+        else if(choice ==2){
+            std::cout << "Enter number of edges: "<< std::endl;
+            std::cin >> edgesNum;
+            if (edgesNum <= 0) {
+                std::cerr << "Error: Number of edges must be a positive integer." << std::endl;
+                close(sockfd);
+                return 1;
+            }
+            if (!sendRandom(sockfd, vertices, edgesNum)) {
+                std::cerr << "Failed to send random graph to server." << std::endl;
+                close(sockfd);
+                return 1;
             }
         }
 
-
-        // std::cout<<"Enter your Algorithem choice:"<<std::endl;
-        // std::cout << "1. MST" << std::endl;
-        // std::cout << "2. Max Flow" << std::endl;
-        // std::cout << "3. Path Cover" << std::endl;
-        // std::cout << "4. SCC" << std::endl;
-        // std::cout << "5. Exit" << std::endl;
-        // int client_choice;
-        // std::string input;
-        // std::cin >> client_choice;
-        // switch (client_choice) {
-        //     case 1:
-        //         std::cout << "MST algorithm selected." << std::endl;
-        //         input = "MST";
-        //         break;
-        //     case 2:
-        //         std::cout << "Max Flow algorithm selected." << std::endl;
-        //         input = "MaxFlow";
-        //         break;
-        //     case 3:
-        //         std::cout << "Path Cover algorithm selected." << std::endl;
-        //         input = "PathCover";
-        //         break;
-        //     case 4:
-        //         std::cout << "SCC algorithm selected." << std::endl;
-        //         input = "SCC";
-        //         break;
-        //     case 5:
-        //         std::cout << "Exiting client..." << std::endl;
-        //         close(sockfd);
-        //         return 0;
-        //     default:
-        //         std::cerr << "Invalid choice. Please try again." << std::endl;
-        //         continue; // Skip sending matrix if choice is invalid
-        // }
-        // Send the adjacency matrix to the server
-        if (!sendMatrix(sockfd, adjMat)) {
-            std::cerr << "Failed to send adjacency matrix to server." << std::endl;
-            close(sockfd);
-            return 1;
-        }
-        std::cout << "Adjacency matrix sent to server." << std::endl;
-        //std::cout << "Asked for " << input << "." << std::endl;
 
       ////////////////////////maybe need 4 times loop
         int msg_len = 0;
