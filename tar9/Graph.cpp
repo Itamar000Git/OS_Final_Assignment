@@ -35,16 +35,19 @@ struct Task {
 };
 std::mutex coutMutex;
 
-// Global variables for Leader-Follower
 std::queue<Task> mst_task_Q,maxFlow_task_Q,pathCover_task_Q,scc_task_Q; // Queue to hold tasks
 std::mutex mstQueueMutex,maxFlowQueueMutex,pathCoverQueueMutex,sccQueueMutex; // Mutex for thread-safe access to the queue
 std::condition_variable mstCV,maxFlowCV,pathCoverCV,sccCV; // Condition variable to notify workers
 
 std::atomic<bool> serverRunning{true}; // Flag to control server running state
-
-Graph g;
-
-// Worker function that runs 4 algorithms and sends results back
+Graph g; // Global graph object
+/**
+ * @brief Worker function for Minimum Spanning Tree (MST) processing.
+ * @details This function processes tasks from the MST queue, executes the MST algorithm,
+ * and saves the results to the next queue for Max Flow processing.
+ * @throws std::runtime_error if the MST algorithm fails.
+ * @note This function runs in a separate thread.
+ */
 void MST_worker() {
     while (serverRunning) {
         std::unique_lock<std::mutex> lock(mstQueueMutex);
@@ -69,10 +72,17 @@ void MST_worker() {
             maxFlow_task_Q.push({task.client_socket, task.matrix, task.results});
             maxFlowCV.notify_one();
         }
- 
 
     }
 }
+
+/**
+ * @brief Worker function for Maximum Flow processing.
+ * @details This function processes tasks from the Max Flow queue, executes the Max Flow algorithm,
+ * and saves the results to the next queue for Path Cover processing.
+ * @throws std::runtime_error if the Max Flow algorithm fails.
+ * @note This function runs in a separate thread.
+ */
 void MaxFlow_worker() {
     while (serverRunning) {
         std::unique_lock<std::mutex> lock(maxFlowQueueMutex);
@@ -103,6 +113,13 @@ void MaxFlow_worker() {
     }
 }
 
+/**
+ * @brief Worker function for Path Cover processing.
+ * @details This function processes tasks from the Path Cover queue, executes the Path Cover algorithm,
+ * and saves the results to the next queue for Strongly Connected Components (SCC) processing.
+ * @throws std::runtime_error if the Path Cover algorithm fails.
+ * @note This function runs in a separate thread.
+ */
 void PathCover_worker() {
     while (serverRunning) {
         std::unique_lock<std::mutex> lock(pathCoverQueueMutex);
@@ -129,12 +146,16 @@ void PathCover_worker() {
             scc_task_Q.push({task.client_socket, task.matrix, task.results});
             sccCV.notify_one();
         }
-        
-
     }
-        
 }
 
+/**
+ * @brief Worker function for Strongly Connected Components (SCC) processing.
+ * @details This function processes tasks from the SCC queue, executes the SCC algorithm,
+ * and sends the results back to the client.
+ * @throws std::runtime_error if the SCC algorithm fails.
+ * @note This function runs in a separate thread.
+ */
 void SCC_worker() {
     while (serverRunning) {
         std::unique_lock<std::mutex> lock(sccQueueMutex);
@@ -161,14 +182,16 @@ void SCC_worker() {
         if (send(task.client_socket, &result_len, sizeof(result_len), 0) >= 0) {
             send(task.client_socket, task.results.c_str(), result_len, 0);
         }
-        
-       // close(task.client_socket);
-
-       // std::cout << "Task completed and sent to client" << std::endl;
     }
 }
 
-
+/**
+ * @brief Creates a random graph with the specified number of vertices and edges.
+ * @param v_num The number of vertices in the graph.
+ * @param e_num The number of edges in the graph.
+ * @param g The graph object to populate.
+ * @param max_weight The maximum weight for the edges (default is 20).
+ */
 void CreateRandomGraph(size_t v_num, size_t e_num, Graph& g, int max_weight = 20) {
     //std::cout << "Creating random graph with " << v_num << " vertices and " << e_num << " edges." << std::endl;
     g.vertices = v_num;
@@ -198,15 +221,14 @@ void CreateRandomGraph(size_t v_num, size_t e_num, Graph& g, int max_weight = 20
 }
 
 void run_server(int port_tcp, Graph& g) {
-
     int server_fd, new_socket, max_sd, activity, sd;
     int client_socket[FD_SETSIZE] = {0};
     struct sockaddr_in address;
     fd_set readfds;
 
-
     std::vector<std::thread> workers; // Create worker threads
  
+    // Create worker threads for each algorithm
     workers.emplace_back(MST_worker);
     workers.emplace_back(MaxFlow_worker);
     workers.emplace_back(PathCover_worker);
@@ -348,9 +370,9 @@ void run_server(int port_tcp, Graph& g) {
                 if (success) {
                    // std::cout << "Received adjacency matrix of size " << n << "x" << n << "\n";
                     {
-                        std::lock_guard<std::mutex> lock(mstQueueMutex);
-                        mst_task_Q.push({sd, newMatrix});
-                        mstCV.notify_one();
+                        std::lock_guard<std::mutex> lock(mstQueueMutex); 
+                        mst_task_Q.push({sd, newMatrix});// Add the task to the MST queue
+                        mstCV.notify_one();// Notify the MST worker thread
                     }
                    
 
@@ -365,6 +387,7 @@ void run_server(int port_tcp, Graph& g) {
 
     // Cleanup - signal workers to stop and wait for them
     serverRunning = false;
+    // Notify all worker threads to wake up and exit
     {
     std::lock_guard<std::mutex> lock(mstQueueMutex);
     mstCV.notify_all();
@@ -385,6 +408,7 @@ void run_server(int port_tcp, Graph& g) {
         worker.join();
     }
 
+    // Close all client sockets
     for (int i = 0; i < FD_SETSIZE; i++) {
         if (client_socket[i] > 0) {
             close(client_socket[i]);
