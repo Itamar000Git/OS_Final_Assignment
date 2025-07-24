@@ -73,6 +73,6 @@ std::string SCC::activate(Graph& g) {
         }
         oss << "\n";
     }
-    std::cout <<"The strongly connected components are:\n" <<oss.str()<<std::endl;
+    //std::cout <<"The strongly connected components are:\n" <<oss.str()<<std::endl;
     return oss.str();
 }

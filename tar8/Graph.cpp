@@ -90,7 +90,7 @@ void workerFunction() {
         }
         
        // close(task.client_socket);
-        std::cout << "Task completed and sent to client" << std::endl;
+       // std::cout << "Task completed and sent to client" << std::endl;
     }
 }
 

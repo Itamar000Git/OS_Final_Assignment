@@ -1,0 +1,68 @@
+        -:    0:Source:../tar8/MST.cpp
+        -:    0:Graph:MST.gcno
+        -:    0:Data:MST.gcda
+        -:    0:Runs:7
+        -:    1:#include "MST.hpp"
+        -:    2:#include "Graph.hpp"
+        -:    3:#include <vector>
+        -:    4:#include <algorithm>
+        -:    5:#include <iostream>
+        -:    6:
+        -:    7:
+        -:    8:
+        -:    9:struct Edge {
+        -:   10:    int u, v, w;
+       18:   11:    bool operator<(const Edge& other) const {
+       18:   12:        return w < other.w;
+        -:   13:    }
+        -:   14:};
+        -:   15:
+        -:   16:class UnionFind {
+        -:   17:    std::vector<int> parent;
+        -:   18:public:
+        6:   19:    UnionFind(int n) : parent(n) {
+       27:   20:        for (int i = 0; i < n; ++i) parent[i] = i;
+        3:   21:    }
+       48:   22:    int find(int x) {
+      48*:   23:        if (parent[x] != x) parent[x] = find(parent[x]);
+       48:   24:        return parent[x];
+        -:   25:    }
+       12:   26:    void unite(int x, int y) {
+       12:   27:        parent[find(x)] = find(y);
+       12:   28:    }
+        -:   29:};
+        -:   30:
+        3:   31:int MST::culcMST(Graph &graph) {
+        3:   32:    Graph g=graph;
+        3:   33:    int n = g.getVertices();
+       27:   34:    for(int i = 0; i < n; ++i) {
+      240:   35:        for (int j = 0; j < n; ++j) {
+      216:   36:            if (g.adjMat[i][j] == 0 && i != j) {
+      167:   37:                g.adjMat[i][j] = inf; // Use inf to represent no edge
+        -:   38:            }
+        -:   39:        }
+        -:   40:    }
+        3:   41:    std::vector<Edge> edges;
+       27:   42:    for (int i = 0; i < n; ++i) {
+      120:   43:        for (int j = i + 1; j < n; ++j) { 
+       96:   44:            if (g.adjMat[i][j] != inf) {
+       12:   45:                edges.push_back({i, j, g.adjMat[i][j]});
+        -:   46:            }
+        -:   47:        }
+        -:   48:    }
+        3:   49:    std::sort(edges.begin(), edges.end());
+        3:   50:    UnionFind uf(n);
+        3:   51:    int mst_weight = 0, edges_used = 0;
+       15:   52:    for (const auto& e : edges) {
+       12:   53:        if (uf.find(e.u) != uf.find(e.v)) {
+       12:   54:            uf.unite(e.u, e.v);
+       12:   55:            mst_weight += e.w;
+       12:   56:            edges_used++;
+        -:   57:        }
+        -:   58:    }
+        3:   59:    if (edges_used != n - 1) {
+        -:   60:       // std::cerr << "Graph is not connected, MST does not exist\n";
+        2:   61:        return -1;
+        -:   62:    }
+        1:   63:    return mst_weight;
+        3:   64:}

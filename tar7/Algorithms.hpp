@@ -6,6 +6,11 @@
 class Algorithms{
     public:
     ~Algorithms()=default;
+    /**
+     * @brief Activate the algorithm on the given graph.
+     * @param g The graph to process.
+     * @return A string containing the result of the algorithm.
+     */
     virtual std::string activate(Graph& g)=0;
 };
 

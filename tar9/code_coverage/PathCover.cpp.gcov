@@ -1,0 +1,40 @@
+        -:    0:Source:../tar8/PathCover.cpp
+        -:    0:Graph:PathCover.gcno
+        -:    0:Data:PathCover.gcda
+        -:    0:Runs:7
+        -:    1:#include "PathCover.hpp"
+        -:    2:#include "Graph.hpp"
+        -:    3:#include <vector>
+        -:    4:#include <algorithm>
+        -:    5:#include <iostream>
+        -:    6:
+        3:    7:int PathCover::findPathCover(Graph &g, std::vector<std::vector<int>>& allPaths) {
+        3:    8:    int n = g.getVertices();
+        3:    9:    std::vector<bool> visited(n, false);
+        3:   10:    int pathCover = 0;
+        -:   11:
+       27:   12:    for (int i = 0; i < n; ++i) {
+       24:   13:        if (!visited[i]) {
+       12:   14:            std::vector<int> path;
+       24:   15:            std::vector<int> stack = {i};
+       36:   16:            while (!stack.empty()) {
+       24:   17:                int u = stack.back();
+       24:   18:                stack.pop_back();
+       24:   19:                if (!visited[u]) {
+       24:   20:                    visited[u] = true;
+       24:   21:                    path.push_back(u);
+      240:   22:                    for (int v = 0; v < n; ++v) {
+      216:   23:                        if (g.adjMat[u][v] != 0 && g.adjMat[u][v] != inf && !visited[v]) {
+       12:   24:                            stack.push_back(v);
+        -:   25:                        }
+        -:   26:                    }
+        -:   27:                }
+        -:   28:            }
+       12:   29:            if (!path.empty()) {
+       12:   30:                allPaths.push_back(path);
+       12:   31:                pathCover++;
+        -:   32:            }
+       12:   33:        }
+        -:   34:    }
+        3:   35:    return pathCover;
+        3:   36:}

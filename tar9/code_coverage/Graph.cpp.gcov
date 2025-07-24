@@ -1,0 +1,552 @@
+        -:    0:Source:Graph.cpp
+        -:    0:Graph:Graph.gcno
+        -:    0:Data:Graph.gcda
+        -:    0:Runs:7
+        -:    1:#include <iostream>
+        -:    2:#include "Graph.hpp"
+        -:    3:#include <stack>
+        -:    4:#include <string>
+        -:    5:#include <getopt.h>
+        -:    6:#include <stdexcept>
+        -:    7:#include <random>
+        -:    8:#include <iomanip> 
+        -:    9:#include <sys/socket.h>
+        -:   10:#include <netinet/in.h>
+        -:   11:#include <unistd.h>
+        -:   12:#include <algorithm>
+        -:   13:#include <thread>
+        -:   14:#include <mutex>
+        -:   15:#include <condition_variable>
+        -:   16:#include <queue>
+        -:   17:#include <atomic>
+        -:   18:#include "../tar8/Algorithms.hpp"
+        -:   19:#include "../tar8/MST.hpp"
+        -:   20:#include "../tar8/Strategy.hpp"
+        -:   21:#include "../tar8/Factory.hpp"
+        -:   22:#include "../tar8/MaxFlow.hpp"
+        -:   23:#include "../tar8/PathCover.hpp"
+        -:   24:#include "../tar8/SCC.hpp"
+        -:   25:#include <random>
+        -:   26:#include <chrono>   
+        -:   27:
+       15:   28:Graph::Graph() : vertices(0), EdgesNum(0) {}
+        -:   29:
+        -:   30:// Task structure for Leader-Follower pattern
+        -:   31:struct Task {
+        -:   32:    int client_socket;
+        -:   33:    std::vector<std::vector<int>> matrix;
+        -:   34:    std::string results = "";
+        -:   35:};
+        -:   36:std::mutex coutMutex;
+        -:   37:
+        -:   38:// Global variables for Leader-Follower
+        -:   39:std::queue<Task> mst_task_Q,maxFlow_task_Q,pathCover_task_Q,scc_task_Q; // Queue to hold tasks
+        -:   40:std::mutex mstQueueMutex,maxFlowQueueMutex,pathCoverQueueMutex,sccQueueMutex; // Mutex for thread-safe access to the queue
+        -:   41:std::condition_variable mstCV,maxFlowCV,pathCoverCV,sccCV; // Condition variable to notify workers
+        -:   42:
+        -:   43:std::atomic<bool> serverRunning{true}; // Flag to control server running state
+        -:   44:
+        -:   45:Graph g;
+        -:   46:
+        -:   47:// Worker function that runs 4 algorithms and sends results back
+        2:   48:void MST_worker() {
+        5:   49:    while (serverRunning) {
+        5:   50:        std::unique_lock<std::mutex> lock(mstQueueMutex);
+       15:   51:        mstCV.wait(lock, []{ return !mst_task_Q.empty() || !serverRunning; });
+        -:   52:
+        5:   53:        if (!serverRunning && mst_task_Q.empty()) break;
+        3:   54:        Task task = mst_task_Q.front();
+        3:   55:        mst_task_Q.pop();
+        3:   56:        lock.unlock();
+        -:   57:        
+        -:   58:        // Process the task
+        3:   59:        g.parseFromMatrix(task.matrix);
+        -:   60:    
+        -:   61:        // MST
+        3:   62:        Strategy mst_stra;
+        3:   63:        Algorithms* mst_alg = AlgorithmFactory::createAlgorithm("MST");
+        3:   64:        mst_stra.setStrategy(mst_alg);
+        3:   65:        task.results += "MST: " + mst_stra.execute(g) + "\n";
+        3:   66:        delete mst_alg;
+        -:   67:        {
+        3:   68:            std::lock_guard<std::mutex> lock(maxFlowQueueMutex);
+        3:   69:            maxFlow_task_Q.push({task.client_socket, task.matrix, task.results});
+        3:   70:            maxFlowCV.notify_one();
+        3:   71:        }
+        -:   72: 
+        -:   73:
+        5:   74:    }
+        5:   75:}
+        2:   76:void MaxFlow_worker() {
+        5:   77:    while (serverRunning) {
+        5:   78:        std::unique_lock<std::mutex> lock(maxFlowQueueMutex);
+       15:   79:        maxFlowCV.wait(lock, []{ return !maxFlow_task_Q.empty() || !serverRunning; });
+        -:   80:
+        5:   81:        if (!serverRunning && maxFlow_task_Q.empty()) break;
+        -:   82:
+        3:   83:        Task task = maxFlow_task_Q.front();
+        3:   84:        maxFlow_task_Q.pop();
+        3:   85:        lock.unlock();
+        -:   86:
+        -:   87:        // Process the task
+        3:   88:        g.parseFromMatrix(task.matrix);
+        -:   89:        // MaxFlow
+        3:   90:        Strategy maxFlow_stra;
+        3:   91:        Algorithms* maxFlow_alg = AlgorithmFactory::createAlgorithm("MaxFlow");
+        3:   92:        maxFlow_stra.setStrategy(maxFlow_alg);
+        3:   93:        task.results += "MaxFlow: " + maxFlow_stra.execute(g) + "\n";
+        3:   94:        delete maxFlow_alg;
+        -:   95:
+        -:   96:        {
+        3:   97:            std::lock_guard<std::mutex> lock(pathCoverQueueMutex);
+        3:   98:            pathCover_task_Q.push({task.client_socket, task.matrix, task.results});
+        3:   99:            pathCoverCV.notify_one();
+        3:  100:        }
+        -:  101:       
+        -:  102:
+        5:  103:    }
+        5:  104:}
+        -:  105:
+        2:  106:void PathCover_worker() {
+        5:  107:    while (serverRunning) {
+        5:  108:        std::unique_lock<std::mutex> lock(pathCoverQueueMutex);
+       15:  109:        pathCoverCV.wait(lock, []{ return !pathCover_task_Q.empty() || !serverRunning; });
+        -:  110:
+        5:  111:        if (!serverRunning && pathCover_task_Q.empty()) break;
+        -:  112:
+        3:  113:        Task task = pathCover_task_Q.front();
+        3:  114:        pathCover_task_Q.pop();
+        3:  115:        lock.unlock();
+        -:  116:
+        -:  117:        // Process the task
+        3:  118:        g.parseFromMatrix(task.matrix);
+        -:  119:
+        -:  120:        // PathCover
+        3:  121:        Strategy pathCover_stra;
+        3:  122:        Algorithms* pathCover_alg = AlgorithmFactory::createAlgorithm("PathCover");
+        3:  123:        pathCover_stra.setStrategy(pathCover_alg);
+        3:  124:        task.results += "PathCover: " + pathCover_stra.execute(g) + "\n";
+        3:  125:        delete pathCover_alg;
+        -:  126:        
+        -:  127:        {
+        3:  128:            std::lock_guard<std::mutex> lock(sccQueueMutex);
+        3:  129:            scc_task_Q.push({task.client_socket, task.matrix, task.results});
+        3:  130:            sccCV.notify_one();
+        3:  131:        }
+        -:  132:        
+        -:  133:
+        5:  134:    }
+        -:  135:        
+        5:  136:}
+        -:  137:
+        2:  138:void SCC_worker() {
+        5:  139:    while (serverRunning) {
+        5:  140:        std::unique_lock<std::mutex> lock(sccQueueMutex);
+       15:  141:        sccCV.wait(lock, []{ return !scc_task_Q.empty() || !serverRunning; });
+        -:  142:
+        5:  143:        if (!serverRunning && scc_task_Q.empty()) break;
+        -:  144:
+        3:  145:        Task task = scc_task_Q.front();
+        3:  146:        scc_task_Q.pop();
+        3:  147:        lock.unlock();
+        -:  148:
+        -:  149:        // Process the task
+        3:  150:        g.parseFromMatrix(task.matrix);
+        -:  151:        
+        -:  152:        // SCC
+        3:  153:        Strategy scc_stra;
+        3:  154:        Algorithms* scc_alg = AlgorithmFactory::createAlgorithm("SCC");
+        3:  155:        scc_stra.setStrategy(scc_alg);
+        3:  156:        task.results += "SCC: " + scc_stra.execute(g) + "\n";
+        3:  157:        delete scc_alg;
+        -:  158:        
+        -:  159:        // Send results back to client
+        3:  160:        int result_len = task.results.size();
+        3:  161:        if (send(task.client_socket, &result_len, sizeof(result_len), 0) >= 0) {
+        3:  162:            send(task.client_socket, task.results.c_str(), result_len, 0);
+        -:  163:        }
+        -:  164:        
+        -:  165:       // close(task.client_socket);
+        -:  166:
+        -:  167:       // std::cout << "Task completed and sent to client" << std::endl;
+        5:  168:    }
+        2:  169:}
+        -:  170:
+        -:  171:
+        1:  172:void CreateRandomGraph(size_t v_num, size_t e_num, Graph& g, int max_weight = 20) {
+        -:  173:    //std::cout << "Creating random graph with " << v_num << " vertices and " << e_num << " edges." << std::endl;
+        1:  174:    g.vertices = v_num;
+        1:  175:    g.EdgesNum = 0;
+        2:  176:    g.adjMat.assign(v_num, std::vector<int>(v_num, 0)); 
+        -:  177:
+        1:  178:    std::vector<std::pair<int, int>> allEdges;
+       11:  179:    for (size_t u = 0; u < v_num; ++u) {
+      110:  180:        for (size_t v = 0; v < v_num; ++v) {
+      100:  181:            allEdges.emplace_back(u, v);
+        -:  182:        }
+        -:  183:    }
+        1:  184:    std::random_device rd;
+        1:  185:    std::mt19937 gen(rd());
+        1:  186:    std::shuffle(allEdges.begin(), allEdges.end(), gen);
+        1:  187:    std::uniform_int_distribution<int> weight_dist(1, max_weight); 
+        6:  188:    for (size_t i = 0; i < e_num && i < allEdges.size(); ++i) {
+        5:  189:        int u = allEdges[i].first;
+        5:  190:        int v = allEdges[i].second;
+        5:  191:        int w = weight_dist(gen);
+        5:  192:        g.adjMat[u][v] = w;
+        -:  193:       // g.adjMat[v][u] = w;
+        5:  194:        g.EdgesNum++;
+        -:  195:  
+        -:  196:    }
+        1:  197:      g.printGraph(); 
+        1:  198:}
+        -:  199:
+        2:  200:void run_server(int port_tcp, Graph& g) {
+        -:  201:
+        -:  202:    int server_fd, new_socket, max_sd, activity, sd;
+        2:  203:    int client_socket[FD_SETSIZE] = {0};
+        -:  204:    struct sockaddr_in address;
+        -:  205:    fd_set readfds;
+        -:  206:
+        -:  207:
+        2:  208:    std::vector<std::thread> workers; // Create worker threads
+        -:  209: 
+        2:  210:    workers.emplace_back(MST_worker);
+        2:  211:    workers.emplace_back(MaxFlow_worker);
+        2:  212:    workers.emplace_back(PathCover_worker);
+        2:  213:    workers.emplace_back(SCC_worker);
+        -:  214:
+        -:  215:    // Create a TCP socket
+        2:  216:    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+    #####:  217:        throw std::runtime_error("socket failed");
+        -:  218:    }
+        2:  219:    int opt = 1;
+        -:  220:    // Set socket options to allow reuse of the address
+        2:  221:    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+    #####:  222:        throw std::runtime_error("setsockopt failed");
+        -:  223:    }
+        -:  224:
+        -:  225:    // Set up the address structure for TCP
+        2:  226:    address.sin_family = AF_INET;
+        2:  227:    address.sin_addr.s_addr = INADDR_ANY;
+        2:  228:    address.sin_port = htons(port_tcp);
+        2:  229:    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {// Bind the socket to the address
+    #####:  230:        throw std::runtime_error("bind failed");
+        -:  231:    }
+        2:  232:    if (listen(server_fd, 10) < 0) {// Listen for incoming connections
+    #####:  233:        throw std::runtime_error("listen failed");
+        -:  234:    }
+        -:  235:    
+        -:  236:      
+        2:  237:        std::cout << "Server listening over tcp on port " << port_tcp << std::endl;
+        -:  238:    
+        -:  239:
+        -:  240:    while (true) {// Main loop for handling connections and commands
+      153:  241:        FD_ZERO(&readfds);
+        9:  242:        FD_SET(server_fd, &readfds); // Add TCP server socket to the set
+        9:  243:        FD_SET(0, &readfds); // Add stdin to the set
+        -:  244:
+        -:  245:       
+        9:  246:        max_sd = server_fd;
+       9*:  247:        if (max_sd < 0) max_sd = 0;
+        -:  248:
+     9225:  249:        for (int i = 0; i < FD_SETSIZE; i++) { // Add all client sockets to the set
+     9216:  250:            sd = client_socket[i];
+     9216:  251:            if (sd > 0)
+        5:  252:                FD_SET(sd, &readfds);
+     9216:  253:            if (sd > max_sd)
+        5:  254:                max_sd = sd;
+        -:  255:        }
+        -:  256:        
+        9:  257:        activity = select(max_sd + 1, &readfds, nullptr, nullptr, nullptr);// Wait for activity on the sockets
+       9*:  258:        if (activity < 0 && errno != EINTR) {
+        -:  259:            //std::cout << "select error" << std::endl;
+    #####:  260:            break;
+        -:  261:        }
+        -:  262:
+        -:  263:        // Handle new TCP connections
+        9:  264:        if (FD_ISSET(server_fd, &readfds)) {
+        2:  265:            socklen_t addrlen = sizeof(address);
+       2*:  266:            if ((new_socket = accept(server_fd, (struct sockaddr *)&address, &addrlen)) < 0) {
+        -:  267:                //std::cout << "accept error" << std::endl;
+    #####:  268:                continue;
+        -:  269:            }
+       2*:  270:            for (int i = 0; i < FD_SETSIZE; i++) {
+        2:  271:                if (client_socket[i] == 0) {
+        2:  272:                    client_socket[i] = new_socket; // Store the new socket in the client_socket array
+        2:  273:                    break;
+        -:  274:                }
+        -:  275:            }
+        -:  276:            //std::cout << "New connection, socket fd: " << new_socket << std::endl;
+        -:  277:        }
+        -:  278:           // Handle input from stdin
+        9:  279:        if (FD_ISSET(0, &readfds)) {
+        2:  280:            std::string input;
+        2:  281:            std::getline(std::cin, input);
+        2:  282:            if (input == "exit") {
+        -:  283:                //std::cout << "Exiting server..." << std::endl;
+        2:  284:                break;
+        -:  285:            }
+        -:  286:            else {
+        -:  287:                //std::cout << "Unknown command: " << input << std::endl;
+        -:  288:            }
+        -:  289:            
+       2*:  290:        }
+     7175:  291:        for (int i = 0; i < FD_SETSIZE; i++) {
+     7168:  292:            sd = client_socket[i];
+     7168:  293:            if (sd > 0 && FD_ISSET(sd, &readfds)) {
+        5:  294:                char type_buffer[16] = {0};
+        5:  295:                ssize_t received = recv(sd, type_buffer, sizeof(type_buffer), MSG_WAITALL);
+        5:  296:                if (received <= 0) {
+        -:  297:                    //std::cerr << "Failed to receive type\n";
+        2:  298:                    close(sd);
+        2:  299:                    client_socket[i] = 0;
+        2:  300:                    continue;
+        -:  301:                }
+        3:  302:                std::string type(type_buffer);
+        -:  303:
+        3:  304:                int n = 0;
+        3:  305:                received = recv(sd, &n, sizeof(n), MSG_WAITALL);
+       3*:  306:                if (received != sizeof(n) || n <= 0) {
+        -:  307:                   // std::cerr << "Failed to receive valid matrix size\n";
+    #####:  308:                    close(sd);
+    #####:  309:                    client_socket[i] = 0;
+    #####:  310:                    continue;
+        -:  311:                }
+        -:  312:
+        -:  313:                //std::cout << "Received matrix size: " << n << "\n";
+        3:  314:                bool success = true;
+        3:  315:                std::vector<std::vector<int>> newMatrix;
+        -:  316:
+        3:  317:                if (type == "matrix") {
+        2:  318:                    newMatrix.resize(n, std::vector<int>(n));
+       16:  319:                    for (int row = 0; row < n; ++row) {
+       14:  320:                        received = recv(sd, newMatrix[row].data(), n * sizeof(int), MSG_WAITALL);
+       14:  321:                        if (received != n * sizeof(int)) {
+        -:  322:                            //std::cerr << "Failed to receive row " << row << "\n";
+    #####:  323:                            success = false;
+    #####:  324:                            break;
+        -:  325:                        }
+        -:  326:                    }
+       1*:  327:                } else if (type == "random") {
+        1:  328:                    size_t e_num = 0;
+        1:  329:                    received = recv(sd, &e_num, sizeof(e_num), MSG_WAITALL);
+       1*:  330:                    if (received != sizeof(e_num)) {
+        -:  331:                        //std::cerr << "Failed to receive number of edges\n";
+    #####:  332:                        close(sd);
+    #####:  333:                        client_socket[i] = 0;
+    #####:  334:                        continue;
+        -:  335:                    }
+        -:  336:
+        -:  337:                    //std::cout << "Received random graph request with vertices: " << n << " edges: " << e_num << "\n";
+        1:  338:                    Graph tempGraph;
+        1:  339:                    CreateRandomGraph(n, e_num, tempGraph);
+        1:  340:                    newMatrix = tempGraph.adjMat;
+        1:  341:                } else {
+        -:  342:                    //std::cerr << "Unknown graph type received: " << type << "\n";
+    #####:  343:                    close(sd);
+    #####:  344:                    client_socket[i] = 0;
+    #####:  345:                    continue;
+        -:  346:                }
+        -:  347:
+        3:  348:                if (success) {
+        -:  349:                   // std::cout << "Received adjacency matrix of size " << n << "x" << n << "\n";
+        -:  350:                    {
+        3:  351:                        std::lock_guard<std::mutex> lock(mstQueueMutex);
+        3:  352:                        mst_task_Q.push({sd, newMatrix});
+        3:  353:                        mstCV.notify_one();
+        3:  354:                    }
+        -:  355:                   
+        -:  356:
+        -:  357:                   // std::cout << "Task added to queue for processing" << std::endl;
+        -:  358:                } else {
+    #####:  359:                    close(sd);
+    #####:  360:                    client_socket[i] = 0;
+        -:  361:                }
+        3:  362:            }
+        -:  363:        }
+        7:  364:    }
+        -:  365:
+        -:  366:    // Cleanup - signal workers to stop and wait for them
+        2:  367:    serverRunning = false;
+        -:  368:    {
+        2:  369:    std::lock_guard<std::mutex> lock(mstQueueMutex);
+        2:  370:    mstCV.notify_all();
+        2:  371:    }
+        -:  372:    {
+        2:  373:    std::lock_guard<std::mutex> lock(maxFlowQueueMutex);
+        2:  374:    maxFlowCV.notify_all();
+        2:  375:    }
+        -:  376:    {
+        2:  377:    std::lock_guard<std::mutex> lock(pathCoverQueueMutex);
+        2:  378:    pathCoverCV.notify_all();
+        2:  379:    }
+        -:  380:    {
+        2:  381:    std::lock_guard<std::mutex> lock(sccQueueMutex);
+        2:  382:    sccCV.notify_all();
+        2:  383:    }
+       10:  384:    for (auto& worker : workers) {
+        8:  385:        worker.join();
+        -:  386:    }
+        -:  387:
+     2050:  388:    for (int i = 0; i < FD_SETSIZE; i++) {
+     2048:  389:        if (client_socket[i] > 0) {
+    #####:  390:            close(client_socket[i]);
+        -:  391:        }
+        -:  392:    }
+        -:  393:
+        -:  394:    //std::cout << "Server closed" << std::endl;
+        -:  395:
+       11:  396:}
+        -:  397:
+        -:  398:
+        -:  399:
+        1:  400:void Graph::printGraph() {
+        1:  401:    std::cout << "    ";
+       11:  402:    for (int j = 0; j < vertices; ++j) {
+       10:  403:        std::cout << std::setw(4) << j;
+        -:  404:    }
+        1:  405:    std::cout << "\n";
+        -:  406:
+        1:  407:    std::cout << "    ";
+       11:  408:    for (int j = 0; j < vertices; ++j) {
+       10:  409:        std::cout << "----";
+        -:  410:    }
+        1:  411:    std::cout << "\n";
+        -:  412:
+       11:  413:    for (int i = 0; i < vertices; ++i) {
+       10:  414:        std::cout << std::setw(2) << i << " |";
+      110:  415:        for (int j = 0; j < vertices; ++j) {
+      100:  416:            if (adjMat[i][j] == inf)
+    #####:  417:                std::cout << std::setw(4) << "inf";
+        -:  418:            else
+      100:  419:                std::cout << std::setw(4) << adjMat[i][j];
+        -:  420:        }
+       10:  421:        std::cout << "\n";
+        -:  422:    }
+        1:  423:}
+        -:  424:
+        -:  425:
+        2:  426:void Graph::dfs(int u, const std::vector<std::vector<int>>& adj, std::vector<bool>& visited) {
+        2:  427:    visited[u] = true;
+       10:  428:    for (size_t v = 0; v < adj.size(); ++v) {
+        8:  429:        if (adj[u][v] == 1 && !visited[v])
+        1:  430:            dfs(v, adj, visited);
+        -:  431:    }
+        2:  432:}
+        -:  433:
+        3:  434:bool Graph::isConnected(const std::vector<std::vector<int>>& adj) {
+        3:  435:    int n = adj.size();
+        3:  436:    std::vector<bool> visited(n, false);
+        3:  437:    int start = -1;
+       23:  438:    for (int i = 0; i < n; ++i) {
+       21:  439:        int degree = 0;
+      225:  440:        for (int j = 0; j < n; ++j)
+      204:  441:            if (adj[i][j] == 1) degree++;
+       21:  442:        if (degree > 0) {
+        1:  443:            start = i;
+        1:  444:            break;
+        -:  445:        }
+        -:  446:    }
+        3:  447:    if (start == -1)
+        2:  448:        return true; 
+        -:  449:
+        1:  450:    dfs(start, adj, visited);
+        5:  451:    for (int i = 0; i < n; ++i) {
+        4:  452:        int degree = 0;
+       20:  453:        for (int j = 0; j < n; ++j)
+       16:  454:            if (adj[i][j] == 1) degree++;
+       4*:  455:        if (degree > 0 && !visited[i]){
+        -:  456:           // std::cerr << "Graph is not connected: vertex " << i << " is not reachable from vertex " << start << "\n";   
+    #####:  457:            return false;
+        -:  458:        }
+        -:  459:    }
+        1:  460:    return true;
+        3:  461:}
+        3:  462:  bool Graph::hasPath(int src, int dest) const{
+        3:  463:    if (src < 0 || src >= vertices || dest < 0 || dest >= vertices) {
+        -:  464:       //std::cerr << "Invalid source or destination vertex.\n";
+    #####:  465:        return false;
+        -:  466:    }
+        3:  467:    std::vector<bool> visited(vertices, false);
+        3:  468:    std::stack<int> stack;
+        3:  469:    stack.push(src);
+        -:  470:    
+       19:  471:    while (!stack.empty()) {
+       14:  472:        int current = stack.top();
+       14:  473:        stack.pop();
+        -:  474:        
+       14:  475:        if (current == dest) {
+        1:  476:            return true; // Path found
+        -:  477:        }
+        -:  478:        
+       13:  479:        if (!visited[current]) {
+       13:  480:            visited[current] = true;
+      131:  481:            for (int i = 0; i < vertices; ++i) {
+      118:  482:                if (adjMat[current][i] > 0 && !visited[i]) { // Check for positive weights
+       11:  483:                    stack.push(i);
+        -:  484:                }
+        -:  485:            }
+        -:  486:        }
+        -:  487:    }
+        2:  488:    return false; // No path found
+        3:  489:  }
+        -:  490:
+        -:  491:
+        -:  492:
+       12:  493:void Graph::parseFromMatrix(const std::vector<std::vector<int>>& matrix) {
+       12:  494:    this->vertices = matrix.size();
+       12:  495:    this->adjMat = matrix;
+      108:  496:    for(int i = 0; i < vertices; ++i) {
+      960:  497:        for (int j = 0; j < vertices; ++j) {
+      864:  498:            if (matrix[i][j] >= 1) {
+      100:  499:                EdgesNum++;
+        -:  500:            }
+        -:  501:        }
+        -:  502:    }
+       12:  503:}
+        -:  504:
+        -:  505:
+        7:  506:int main(int argc, char* argv[]) {
+        7:  507:    Graph g;
+        7:  508:    std::vector<int> euler;
+        -:  509:  
+        7:  510:    if (argc < 3) { // Check if the required arguments are provided
+        -:  511:          std::cerr << "Usage: " << argv[0]
+        2:  512:                  << " -T <tcp_port> \n";
+        2:  513:        return 0;
+        -:  514:    }
+        -:  515:    int port_tcp;
+        -:  516:    int opt;
+        5:  517:    bool has_tcp = false;
+        7:  518:     while ((opt = getopt(argc, argv, "T:")) != -1) {
+        5:  519:        switch (opt) {
+        -:  520:             
+        4:  521:            case 'T':
+        4:  522:                if(std::atoi(optarg) <= 0) {
+        1:  523:                    std::cerr << "Error: any flag must be a positive integer." << std::endl;
+        1:  524:                    exit(EXIT_FAILURE);
+        -:  525:                }
+        3:  526:                port_tcp = std::atoi(optarg);
+        3:  527:                if (port_tcp <= 0 || port_tcp > 65535) { // Check if port is valid
+        1:  528:                    std::cerr << "Error: Port must be a positive integer between 1 and 65535." << std::endl;
+        1:  529:                    exit(EXIT_FAILURE);
+        -:  530:                }
+        2:  531:                has_tcp = true;
+        2:  532:                break;
+        -:  533:            
+        1:  534:            default:
+        -:  535:                std::cerr << "Usage: " << argv[0]
+        1:  536:                          << " -T <tcp_port>\n";
+        1:  537:                exit(EXIT_FAILURE);
+        -:  538:        }
+        -:  539:    }
+        2:  540:    if (!has_tcp ) {
+    #####:  541:        std::cerr << "Error: Missing TCP port." << std::endl;
+    #####:  542:        exit(EXIT_FAILURE);
+        -:  543:    }
+        -:  544:
+        2:  545:     run_server(port_tcp, g); // Start the server with the provided TCP port
+        -:  546:
+        2:  547:    return 0;
+        4:  548:}

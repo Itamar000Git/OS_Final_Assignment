@@ -1,0 +1,234 @@
+        -:    0:Source:../tar8/client.cpp
+        -:    0:Graph:client.gcno
+        -:    0:Data:client.gcda
+        -:    0:Runs:13
+        -:    1:#include <iostream>
+        -:    2:#include <getopt.h>
+        -:    3:#include <sys/types.h>
+        -:    4:#include <sys/socket.h>
+        -:    5:#include <netinet/in.h>
+        -:    6:#include <cstring>
+        -:    7:#include <netdb.h>
+        -:    8:#include <unistd.h>
+        -:    9:#include <vector>
+        -:   10:#include <limits>
+        -:   11:
+        -:   12:int inf= std::numeric_limits<int>::max();
+        -:   13:
+        2:   14:bool sendMatrix(int sockfd, const std::vector<std::vector<int>>& adjMat) {
+        2:   15:    int n = adjMat.size();
+        2:   16:    std::string type = "matrix";
+        -:   17:
+        -:   18: 
+        2:   19:    char type_buf[16] = {0};
+        2:   20:    std::memcpy(type_buf, type.c_str(), std::min(type.size(), sizeof(type_buf)-1));
+        -:   21:
+        2:   22:    if (send(sockfd, type_buf, sizeof(type_buf), 0) < 0) {
+        -:   23:       // std::cout << "Failed to send matrix type\n";
+    #####:   24:        return false;
+        -:   25:    }
+        -:   26:   
+        2:   27:    if (send(sockfd, &n, sizeof(n), 0) < 0) {
+        -:   28:        //std::cout << "Failed to send matrix size\n";
+    #####:   29:        return false;
+        -:   30:    }
+        -:   31:
+       16:   32:    for (int i = 0; i < n; ++i) {
+       14:   33:        if (send(sockfd, adjMat[i].data(), n * sizeof(int), 0) < 0) {
+        -:   34:           // std::cout << "Failed to send matrix row " << i << "\n";
+    #####:   35:            return false;
+        -:   36:        }
+        -:   37:    }
+        -:   38:
+        2:   39:    return true;
+        2:   40:}
+        -:   41:
+        1:   42:bool sendRandom(int sockfd, int vertices, int edges){
+        1:   43:    int n = vertices;
+        1:   44:    size_t e = static_cast<size_t>(edges);
+        1:   45:    std::string type = "random";
+        -:   46:   // std::cout << "Sending random graph with " << n << " vertices and " << e << " edges." << std::endl;
+        -:   47:
+        1:   48:    if (send(sockfd, type.c_str(), 16, 0) < 0) {
+        -:   49:        //std::cout << "Failed to send random graph type\n";
+    #####:   50:        return false;
+        -:   51:    }
+        1:   52:    if (send(sockfd, &n, sizeof(n), 0) < 0) {
+        -:   53:       // std::cout << "Failed to send vertices size\n";
+    #####:   54:        return false;
+        -:   55:    }
+        1:   56:    if (send(sockfd, &e, sizeof(e), 0) < 0) {
+        -:   57:       // std::cout << "Failed to send edges size\n";
+    #####:   58:        return false;
+        -:   59:    }
+        1:   60:    return true;
+        1:   61:}
+        -:   62:
+        -:   63:
+       13:   64:int main(int argc, char* argv[]) {
+       13:   65:    if (argc < 3) { // Check if there are enough arguments
+    #####:   66:        std::cerr << "Usage: " << argv[0] << "-h <hostname> -p <port> " << std::endl;
+    #####:   67:        return 1;
+        -:   68:    }
+        -:   69:    const char* hostname;
+        -:   70:    int port;
+        -:   71:    int opt;
+       13:   72:    bool has_host = false, has_port = false;
+        -:   73:    
+       33:   74:     while ((opt = getopt(argc, argv, "h:p:")) != -1) {
+       25:   75:        switch (opt) {
+        -:   76:             
+       13:   77:            case 'h':
+       13:   78:                hostname = optarg;
+       13:   79:                has_host = true;
+       13:   80:                break;
+        7:   81:            case 'p':
+        -:   82:                
+        7:   83:                port = std::atoi(optarg);
+        7:   84:                has_port = true;
+        7:   85:                if (port <= 0 || port > 65535) { // Check if port is valid
+    #####:   86:                    std::cerr << "Error: Port must be a positive integer between 1 and 65535." << std::endl;
+    #####:   87:                    exit(EXIT_FAILURE);
+        -:   88:                }
+        7:   89:                break;
+        -:   90:        
+        5:   91:            default:
+        -:   92:                std::cerr << "Usage: " << argv[0]
+        5:   93:                          << " -h <hostname> -p <port>\n";
+        5:   94:                exit(EXIT_FAILURE);
+        -:   95:        }
+        -:   96:    }
+        8:   97:    if (!has_host || !has_port) {
+        1:   98:        std::cerr << "Error: Missing hostname or port." << std::endl;
+        1:   99:        exit(EXIT_FAILURE);
+        -:  100:    }
+        -:  101:
+        -:  102:    int vertices;
+        -:  103:    int edgesNum;
+       14:  104:    std::vector<std::vector<int>> adjMat;
+        7:  105:    int sockfd = -1;
+        -:  106: // Resolve hostname
+        7:  107:    struct hostent* server = gethostbyname(hostname);
+        7:  108:    if (!server) {
+    #####:  109:        std::cerr << "No such host: " << hostname << std::endl;
+    #####:  110:        return 1;
+        -:  111:    }
+        -:  112:
+        -:  113:    // Create socket
+        7:  114:    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+        7:  115:    if (sockfd < 0) {
+    #####:  116:        std::cerr << "Error opening socket" << std::endl;
+    #####:  117:        return 1;
+        -:  118:    }
+        -:  119:    // Set up server address structure
+        -:  120:    struct sockaddr_in serv_addr;
+        7:  121:    std::memset(&serv_addr, 0, sizeof(serv_addr));
+        7:  122:    serv_addr.sin_family = AF_INET;
+        7:  123:    std::memcpy(&serv_addr.sin_addr.s_addr, server->h_addr, server->h_length);
+        7:  124:    serv_addr.sin_port = htons(port);
+        -:  125:
+        -:  126:    // Connect to server
+        7:  127:    if (connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
+    #####:  128:        std::cerr << "Connection failed" << std::endl;
+    #####:  129:        close(sockfd);
+    #####:  130:        return 1;
+        -:  131:    }
+        -:  132:
+        7:  133:    std::cout << "Connected to server." << std::endl;
+        -:  134:
+        -:  135:    while(true){
+       11:  136:        std::cout<<"Enter your choice:"<<std::endl;
+       11:  137:        std::cout << "1. Send adjacency matrix to server" << std::endl;
+       11:  138:        std::cout << "2. Choose a random graph" << std::endl;
+       11:  139:        std::cout << "3. Exit" << std::endl;
+        -:  140:        int choice;
+       11:  141:        std::cin >> choice;
+       11:  142:        if (choice == 3) {
+        4:  143:            std::cout << "Exiting client..." << std::endl;
+        4:  144:            break;
+        -:  145:        }
+        7:  146:        if (choice != 1 && choice != 2) {
+        1:  147:            std::cout << "Invalid choice. Please try again." << std::endl;
+        1:  148:            std::cin.clear(); // Clear error state
+        1:  149:            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Discard invalid input
+        1:  150:            continue; // Skip sending matrix if choice is invalid
+        -:  151:        }
+        -:  152:
+        -:  153:
+        6:  154:        std::cout << "Enter number of vertices: "<< std::endl;
+        6:  155:        std::cin >> vertices;
+        6:  156:        if (vertices <= 0) {
+        1:  157:            std::cerr << "Error: Number of vertices must be a positive integer." << std::endl;
+        1:  158:            close(sockfd);
+        3:  159:            return 1;
+        -:  160:        }
+        -:  161:
+        5:  162:        if(choice == 1){
+        3:  163:            adjMat.clear();
+        3:  164:            adjMat.resize(vertices, std::vector<int>(vertices,inf ));
+        3:  165:            std::cout << "Enter adjacency matrix :" << std::endl;
+        -:  166:            // Read adjacency matrix from standard input
+       26:  167:            for (int i = 0; i < vertices; ++i) {
+      239:  168:                for (int j = 0; j < vertices; ++j) {
+      216:  169:                    std::cin >> adjMat[i][j];
+      216:  170:                    if (adjMat[i][j] < 0) {
+        1:  171:                        std::cerr << "Error: Adjacency matrix must contain non negativ number." << std::endl;
+        1:  172:                        close(sockfd);
+        1:  173:                        return 1;
+        -:  174:
+        -:  175:                }
+        -:  176:
+        -:  177:                }
+        -:  178:            }
+        -:  179:            // Send the adjacency matrix to the server
+        2:  180:            if (!sendMatrix(sockfd, adjMat)) {
+    #####:  181:                std::cout << "Failed to send adjacency matrix to server." << std::endl;
+    #####:  182:                close(sockfd);
+    #####:  183:                return 1;
+        -:  184:            }
+        2:  185:            std::cout << "Adjacency matrix sent to server." << std::endl;
+        -:  186:        }
+        2:  187:        else if(choice ==2){
+        2:  188:            std::cout << "Enter number of edges: "<< std::endl;
+        2:  189:            std::cin >> edgesNum;
+        2:  190:            if (edgesNum <= 0) {
+        1:  191:                std::cerr << "Error: Number of edges must be a positive integer." << std::endl;
+        1:  192:                close(sockfd);
+        1:  193:                return 1;
+        -:  194:            }
+        1:  195:            if (!sendRandom(sockfd, vertices, edgesNum)) {
+    #####:  196:                std::cerr << "Failed to send random graph to server." << std::endl;
+    #####:  197:                close(sockfd);
+    #####:  198:                return 1;
+        -:  199:            }
+        -:  200:        }
+        -:  201:
+        -:  202:
+        -:  203:      ////////////////////////maybe need 4 times loop
+        3:  204:        int msg_len = 0;
+        3:  205:        ssize_t bytes_received = recv(sockfd, &msg_len, sizeof(msg_len), MSG_WAITALL);
+        3:  206:        if (bytes_received != sizeof(msg_len)) {
+    #####:  207:            std::cerr << "Error receiving message length from server." << std::endl;
+    #####:  208:            close(sockfd);
+    #####:  209:            return 1;
+        -:  210:        }
+        -:  211:
+        3:  212:        std::vector<char> buffer(msg_len + 1); 
+        3:  213:        bytes_received = recv(sockfd, buffer.data(), msg_len, MSG_WAITALL);
+        3:  214:        if (bytes_received != msg_len) {
+    #####:  215:            std::cerr << "Error receiving full message from server." << std::endl;
+    #####:  216:            close(sockfd);
+    #####:  217:            return 1;
+        -:  218:        }
+        -:  219:
+        -:  220:        // Null-terminate and print
+        3:  221:        buffer[msg_len] = '\0';
+        3:  222:        std::cout << "Server response: " << buffer.data() << std::endl;
+        -:  223:///////////////////////////////////////////////////////////////////////////////
+        7:  224:    }
+        -:  225:    // Close the socket
+        4:  226:    close(sockfd);
+        4:  227:    std::cout << "Connection closed." << std::endl;
+        4:  228:    return 0;
+        -:  229:
+        -:  230:}

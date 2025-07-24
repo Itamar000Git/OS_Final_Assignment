@@ -1,0 +1,82 @@
+        -:    0:Source:../tar8/SCC.cpp
+        -:    0:Graph:SCC.gcno
+        -:    0:Data:SCC.gcda
+        -:    0:Runs:7
+        -:    1:
+        -:    2:#include "SCC.hpp"
+        -:    3:#include "Graph.hpp"
+        -:    4:#include <vector>
+        -:    5:#include <string>
+        -:    6:#include <stack>
+        -:    7:#include <sstream>
+        -:    8:#include <algorithm>
+        -:    9:
+       24:   10:void dfs(int u, const std::vector<std::vector<int>>& adj, std::vector<bool>& visited, std::vector<int>& order) {
+       24:   11:    visited[u] = true;
+      240:   12:    for (size_t v = 0; v < adj.size(); ++v) {
+      216:   13:        if (adj[u][v] != 0 && !visited[v]) {
+       12:   14:            dfs(v, adj, visited, order);
+        -:   15:        }
+        -:   16:    }
+       24:   17:    order.push_back(u);  
+       24:   18:}
+        -:   19:
+       24:   20:void reverseDFS(int u, const std::vector<std::vector<int>>& revAdj, std::vector<bool>& visited, std::vector<int>& component) {
+       24:   21:    visited[u] = true;
+       24:   22:    component.push_back(u);
+      240:   23:    for (size_t v = 0; v < revAdj.size(); ++v) {
+      216:   24:        if (revAdj[u][v] != 0 && !visited[v]) {
+       11:   25:            reverseDFS(v, revAdj, visited, component);
+        -:   26:        }
+        -:   27:    }
+       24:   28:}
+        -:   29:
+        3:   30:std::vector<std::vector<int>> SCC::findSCC(Graph& g) {
+        3:   31:    int n = g.getVertices();
+        3:   32:    const auto& adj = g.adjMat;
+        3:   33:    std::vector<bool> visited(n, false);
+        3:   34:    std::vector<int> order;
+        -:   35:
+       27:   36:    for (int i = 0; i < n; ++i) {
+       24:   37:        if (!visited[i]) {
+       12:   38:            dfs(i, adj, visited, order);
+        -:   39:        }
+        -:   40:    }
+        -:   41:
+        3:   42:    std::vector<std::vector<int>> revAdj(n, std::vector<int>(n, 0));
+       27:   43:    for (int u = 0; u < n; ++u) {
+      240:   44:        for (int v = 0; v < n; ++v) {
+      216:   45:            if (adj[u][v] != 0) {
+       25:   46:                revAdj[v][u] = adj[u][v];
+        -:   47:            }
+        -:   48:        }
+        -:   49:    }
+        3:   50:    std::fill(visited.begin(), visited.end(), false);
+        3:   51:    std::reverse(order.begin(), order.end());
+        -:   52:
+        3:   53:    std::vector<std::vector<int>> components;
+        -:   54:
+       27:   55:    for (int u : order) {
+       24:   56:        if (!visited[u]) {
+       13:   57:            std::vector<int> component;
+       13:   58:            reverseDFS(u, revAdj, visited, component);
+       13:   59:            components.push_back(component);
+       13:   60:        }
+        -:   61:    }
+        -:   62:
+        6:   63:    return components;
+        3:   64:}
+        -:   65:
+        3:   66:std::string SCC::activate(Graph& g) {
+        3:   67:    std::vector<std::vector<int>> components = findSCC(g);
+        3:   68:    std::ostringstream oss;
+        3:   69:    oss << "SCCs (" << components.size() << " components):\n";
+       16:   70:    for (const auto& comp : components) {
+       37:   71:        for (int v : comp) {
+       24:   72:            oss << v << " ";
+        -:   73:        }
+       13:   74:        oss << "\n";
+        -:   75:    }
+        -:   76:    //std::cout <<"The strongly connected components are:\n" <<oss.str()<<std::endl;
+        6:   77:    return oss.str();
+        3:   78:}

@@ -43,6 +43,7 @@ std::condition_variable mstCV,maxFlowCV,pathCoverCV,sccCV; // Condition variable
 std::atomic<bool> serverRunning{true}; // Flag to control server running state
 
 Graph g;
+
 // Worker function that runs 4 algorithms and sends results back
 void MST_worker() {
     while (serverRunning) {
@@ -163,13 +164,13 @@ void SCC_worker() {
         
        // close(task.client_socket);
 
-        std::cout << "Task completed and sent to client" << std::endl;
+       // std::cout << "Task completed and sent to client" << std::endl;
     }
 }
 
 
 void CreateRandomGraph(size_t v_num, size_t e_num, Graph& g, int max_weight = 20) {
-    std::cout << "Creating random graph with " << v_num << " vertices and " << e_num << " edges." << std::endl;
+    //std::cout << "Creating random graph with " << v_num << " vertices and " << e_num << " edges." << std::endl;
     g.vertices = v_num;
     g.EdgesNum = 0;
     g.adjMat.assign(v_num, std::vector<int>(v_num, 0)); 
@@ -255,7 +256,7 @@ void run_server(int port_tcp, Graph& g) {
         
         activity = select(max_sd + 1, &readfds, nullptr, nullptr, nullptr);// Wait for activity on the sockets
         if (activity < 0 && errno != EINTR) {
-            std::cout << "select error" << std::endl;
+            //std::cout << "select error" << std::endl;
             break;
         }
 
@@ -263,7 +264,7 @@ void run_server(int port_tcp, Graph& g) {
         if (FD_ISSET(server_fd, &readfds)) {
             socklen_t addrlen = sizeof(address);
             if ((new_socket = accept(server_fd, (struct sockaddr *)&address, &addrlen)) < 0) {
-                std::cout << "accept error" << std::endl;
+                //std::cout << "accept error" << std::endl;
                 continue;
             }
             for (int i = 0; i < FD_SETSIZE; i++) {
@@ -272,18 +273,18 @@ void run_server(int port_tcp, Graph& g) {
                     break;
                 }
             }
-            std::cout << "New connection, socket fd: " << new_socket << std::endl;
+            //std::cout << "New connection, socket fd: " << new_socket << std::endl;
         }
            // Handle input from stdin
         if (FD_ISSET(0, &readfds)) {
             std::string input;
             std::getline(std::cin, input);
             if (input == "exit") {
-                std::cout << "Exiting server..." << std::endl;
+                //std::cout << "Exiting server..." << std::endl;
                 break;
             }
             else {
-                std::cout << "Unknown command: " << input << std::endl;
+                //std::cout << "Unknown command: " << input << std::endl;
             }
             
         }
@@ -293,7 +294,7 @@ void run_server(int port_tcp, Graph& g) {
                 char type_buffer[16] = {0};
                 ssize_t received = recv(sd, type_buffer, sizeof(type_buffer), MSG_WAITALL);
                 if (received <= 0) {
-                    std::cerr << "Failed to receive type\n";
+                    //std::cerr << "Failed to receive type\n";
                     close(sd);
                     client_socket[i] = 0;
                     continue;
@@ -303,13 +304,13 @@ void run_server(int port_tcp, Graph& g) {
                 int n = 0;
                 received = recv(sd, &n, sizeof(n), MSG_WAITALL);
                 if (received != sizeof(n) || n <= 0) {
-                    std::cerr << "Failed to receive valid matrix size\n";
+                   // std::cerr << "Failed to receive valid matrix size\n";
                     close(sd);
                     client_socket[i] = 0;
                     continue;
                 }
 
-                std::cout << "Received matrix size: " << n << "\n";
+                //std::cout << "Received matrix size: " << n << "\n";
                 bool success = true;
                 std::vector<std::vector<int>> newMatrix;
 
@@ -318,7 +319,7 @@ void run_server(int port_tcp, Graph& g) {
                     for (int row = 0; row < n; ++row) {
                         received = recv(sd, newMatrix[row].data(), n * sizeof(int), MSG_WAITALL);
                         if (received != n * sizeof(int)) {
-                            std::cerr << "Failed to receive row " << row << "\n";
+                            //std::cerr << "Failed to receive row " << row << "\n";
                             success = false;
                             break;
                         }
@@ -327,25 +328,25 @@ void run_server(int port_tcp, Graph& g) {
                     size_t e_num = 0;
                     received = recv(sd, &e_num, sizeof(e_num), MSG_WAITALL);
                     if (received != sizeof(e_num)) {
-                        std::cerr << "Failed to receive number of edges\n";
+                        //std::cerr << "Failed to receive number of edges\n";
                         close(sd);
                         client_socket[i] = 0;
                         continue;
                     }
 
-                    std::cout << "Received random graph request with vertices: " << n << " edges: " << e_num << "\n";
+                    //std::cout << "Received random graph request with vertices: " << n << " edges: " << e_num << "\n";
                     Graph tempGraph;
                     CreateRandomGraph(n, e_num, tempGraph);
                     newMatrix = tempGraph.adjMat;
                 } else {
-                    std::cerr << "Unknown graph type received: " << type << "\n";
+                    //std::cerr << "Unknown graph type received: " << type << "\n";
                     close(sd);
                     client_socket[i] = 0;
                     continue;
                 }
 
                 if (success) {
-                    std::cout << "Received adjacency matrix of size " << n << "x" << n << "\n";
+                   // std::cout << "Received adjacency matrix of size " << n << "x" << n << "\n";
                     {
                         std::lock_guard<std::mutex> lock(mstQueueMutex);
                         mst_task_Q.push({sd, newMatrix});
@@ -353,7 +354,7 @@ void run_server(int port_tcp, Graph& g) {
                     }
                    
 
-                    std::cout << "Task added to queue for processing" << std::endl;
+                   // std::cout << "Task added to queue for processing" << std::endl;
                 } else {
                     close(sd);
                     client_socket[i] = 0;
@@ -390,7 +391,7 @@ void run_server(int port_tcp, Graph& g) {
         }
     }
 
-    std::cout << "Server closed" << std::endl;
+    //std::cout << "Server closed" << std::endl;
 
 }
 
@@ -452,7 +453,7 @@ bool Graph::isConnected(const std::vector<std::vector<int>>& adj) {
         for (int j = 0; j < n; ++j)
             if (adj[i][j] == 1) degree++;
         if (degree > 0 && !visited[i]){
-            std::cerr << "Graph is not connected: vertex " << i << " is not reachable from vertex " << start << "\n";   
+           // std::cerr << "Graph is not connected: vertex " << i << " is not reachable from vertex " << start << "\n";   
             return false;
         }
     }
@@ -460,7 +461,7 @@ bool Graph::isConnected(const std::vector<std::vector<int>>& adj) {
 }
   bool Graph::hasPath(int src, int dest) const{
     if (src < 0 || src >= vertices || dest < 0 || dest >= vertices) {
-        std::cerr << "Invalid source or destination vertex.\n";
+       //std::cerr << "Invalid source or destination vertex.\n";
         return false;
     }
     std::vector<bool> visited(vertices, false);

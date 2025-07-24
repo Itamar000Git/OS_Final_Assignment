@@ -9,9 +9,18 @@
 class SCC : public Algorithms {
 public:
     ~SCC() = default;
-
+    /**
+     * @brief Activate the SCC algorithm on the given graph.
+     * @param g The graph to process.
+     * @return A string containing the result of the SCC algorithm.
+     */
     std::string activate(Graph& g) override;
 
+    /**
+     * @brief Find the strongly connected components (SCCs) in the given graph.
+     * @param g The graph to process.
+     * @return A string containing the SCCs found in the graph.
+     */
     std::vector<std::vector<int>> findSCC(Graph& g);
 };
 

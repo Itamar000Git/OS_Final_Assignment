@@ -11,6 +11,12 @@
 
 int inf= std::numeric_limits<int>::max();
 
+/**
+ * @brief Sends an adjacency matrix to the server.
+ * @param sockfd The socket file descriptor.
+ * @param adjMat The adjacency matrix to send.
+ * @return True if the matrix was sent successfully, false otherwise.
+ */
 bool sendMatrix(int sockfd, const std::vector<std::vector<int>>& adjMat) {
     int n = adjMat.size();
 
@@ -29,7 +35,11 @@ bool sendMatrix(int sockfd, const std::vector<std::vector<int>>& adjMat) {
     return true;
 }
 
-
+/**
+ * @brief Checks if the graph has an Eulerian cycle and sends the result to the client.
+ * @param g The graph to check.
+ * @param socket_fd The socket file descriptor to send the result to.
+ */
 int main(int argc, char* argv[]) {
     if (argc < 3) { // Check if there are enough arguments
         std::cerr << "Usage: " << argv[0] << "-h <hostname> -p <port> " << std::endl;

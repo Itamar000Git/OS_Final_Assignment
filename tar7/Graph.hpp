@@ -24,19 +24,50 @@ public:
     std::vector<std::vector<int>> adjMat; // adjacency matrix representation
     Graph();
     ~Graph()=default;
+
+    /**
+     * @brief Checks if the graph has an Eulerian cycle.
+     * @param euler A vector to store the Eulerian cycle if it exists.
+     * @return True if the Eulerian cycle exists, false otherwise.
+     */
     void printGraph();
-    //bool EulerianCycle(std::vector<int>& euler);
+    /**
+     * @brief Checks if all vertices have even degree.
+     * @return True if all vertices have even degree, false otherwise.
+     * @throws std::runtime_error if the graph is not Eulerian.
+     */
     bool EvenDeg();
+
+    /**
+     * @brief Gets the number of vertices in the graph.
+     * @return The number of vertices.
+     */
     int getVertices() const { return vertices; }
-    //void CreateRandomGraph(size_t v_num,size_t e_num, size_t seed);
 
     void dfs(int u , const std::vector<std::vector<int>>& adj , std::vector<bool>& visited);
     bool isConnected(const std::vector<std::vector<int>>& adj);
     
-    //void parseFlags(int argc, char* argv[]) ;
+    /**
+     * @brief main function that runs the server and handles client requests.
+     * @param port_tcp The TCP port to listen on.
+     * @param g The graph to process.
+     * @throws std::runtime_error if the socket creation, binding, or listening fails.
+     */
     friend void run_server(int port_tcp,Graph& g);
+
+    /**
+     * @brief Parses an adjacency matrix from a vector of vectors.
+     * @param matrix The adjacency matrix to parse.
+     */
     void parseFromMatrix(const std::vector<std::vector<int>>& matrix);
-    //friend void CheckForEulerianCycle(Graph& g, int socket_fd);
+
+    /**
+     * @brief Checks if the graph has non-negative weights.
+     * @return True if all weights are non-negative, false otherwise.
+     * @details This function checks if all weights in the adjacency matrix are non-negative.
+     * @note This is useful for algorithms that require non-negative weights, such as Dijkstra's algorithm.
+     * @throws std::runtime_error if the graph contains negative weights.
+     */
     bool nonNegativeWeights() const {
         for (const auto& row : adjMat) {
             for (int weight : row) {
@@ -45,8 +76,19 @@ public:
         }
         return true;
     }
+
+    /**
+     * @brief Checks if the graph has a path between two vertices.
+     * @param src The source vertex.
+     * @param dest The destination vertex.
+     * @return True if a path exists, false otherwise.
+     */
     bool hasPath(int src, int dest) const;
 
+    /**
+     * @brief Checks if the graph has self-loops.
+     * @return True if self-loops exist, false otherwise.
+     */
     bool hasSelfLoops() const {
         for (int i = 0; i < vertices; ++i) {
             if (adjMat[i][i] > 0) {

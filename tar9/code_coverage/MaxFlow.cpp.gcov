@@ -1,0 +1,56 @@
+        -:    0:Source:../tar8/MaxFlow.cpp
+        -:    0:Graph:MaxFlow.gcno
+        -:    0:Data:MaxFlow.gcda
+        -:    0:Runs:7
+        -:    1:#include "MaxFlow.hpp"
+        -:    2:#include "Graph.hpp"
+        -:    3:#include <vector>
+        -:    4:#include <algorithm>
+        -:    5:#include <iostream>
+        -:    6:
+        -:    7:#include <queue>
+        -:    8:#include <climits>
+        -:    9:
+        2:   10:bool bfs(const std::vector<std::vector<int>>& g, int s, int t, std::vector<int>& prev) {
+        2:   11:    int n = g.size();
+        2:   12:    std::vector<bool> visited(n, false);
+        2:   13:    std::queue<int> q;
+        2:   14:    q.push(s);
+        2:   15:    visited[s] = true;
+        2:   16:    prev[s] = -1;
+       11:   17:    while (!q.empty()) {
+       10:   18:        int u = q.front(); q.pop();
+      109:   19:        for (int v = 0; v < n; ++v) {
+      100:   20:            if (!visited[v] && g[u][v] > 0) {
+        9:   21:                q.push(v);
+        9:   22:                prev[v] = u;
+        9:   23:                visited[v] = true;
+        9:   24:                if (v == t) return true;
+        -:   25:            }
+        -:   26:        }
+        -:   27:    }
+        1:   28:    return false;
+        2:   29:}
+        -:   30:
+        1:   31:int MaxFlow::culcMaxFlow(Graph &g) {
+        1:   32:    int n = g.getVertices();
+        1:   33:    int s = 0; 
+        1:   34:    int t = n - 1; 
+        1:   35:    std::vector<std::vector<int>> g_copy = g.adjMat;
+        1:   36:    std::vector<int> prev(n);
+        1:   37:    int max_flow = 0;
+        2:   38:    while (bfs(g_copy, s, t, prev)) {
+        1:   39:        int path_flow = INT_MAX;
+       10:   40:        for (int v = t; v != s; v = prev[v]) {
+        9:   41:            int u = prev[v];
+        9:   42:            path_flow = std::min(path_flow, g_copy[u][v]);
+        -:   43:        }
+       10:   44:        for (int v = t; v != s; v = prev[v]) {
+        9:   45:            int u = prev[v];
+        9:   46:            g_copy[u][v] -= path_flow;
+        9:   47:            g_copy[v][u] += path_flow;
+        -:   48:        }
+        1:   49:        max_flow += path_flow;
+        -:   50:    }
+        1:   51:    return max_flow;
+        1:   52:}

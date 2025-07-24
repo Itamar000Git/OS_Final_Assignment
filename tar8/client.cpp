@@ -20,18 +20,18 @@ bool sendMatrix(int sockfd, const std::vector<std::vector<int>>& adjMat) {
     std::memcpy(type_buf, type.c_str(), std::min(type.size(), sizeof(type_buf)-1));
 
     if (send(sockfd, type_buf, sizeof(type_buf), 0) < 0) {
-        std::cout << "Failed to send matrix type\n";
+       // std::cout << "Failed to send matrix type\n";
         return false;
     }
    
     if (send(sockfd, &n, sizeof(n), 0) < 0) {
-        std::cout << "Failed to send matrix size\n";
+        //std::cout << "Failed to send matrix size\n";
         return false;
     }
 
     for (int i = 0; i < n; ++i) {
         if (send(sockfd, adjMat[i].data(), n * sizeof(int), 0) < 0) {
-            std::cout << "Failed to send matrix row " << i << "\n";
+           // std::cout << "Failed to send matrix row " << i << "\n";
             return false;
         }
     }
@@ -43,18 +43,18 @@ bool sendRandom(int sockfd, int vertices, int edges){
     int n = vertices;
     size_t e = static_cast<size_t>(edges);
     std::string type = "random";
-    std::cout << "Sending random graph with " << n << " vertices and " << e << " edges." << std::endl;
+   // std::cout << "Sending random graph with " << n << " vertices and " << e << " edges." << std::endl;
 
     if (send(sockfd, type.c_str(), 16, 0) < 0) {
-        std::cout << "Failed to send random graph type\n";
+        //std::cout << "Failed to send random graph type\n";
         return false;
     }
     if (send(sockfd, &n, sizeof(n), 0) < 0) {
-        std::cout << "Failed to send vertices size\n";
+       // std::cout << "Failed to send vertices size\n";
         return false;
     }
     if (send(sockfd, &e, sizeof(e), 0) < 0) {
-        std::cout << "Failed to send edges size\n";
+       // std::cout << "Failed to send edges size\n";
         return false;
     }
     return true;

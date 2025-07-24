@@ -10,6 +10,11 @@ class MST : public Algorithms{
 public:
     ~MST()=default;
 
+    /**
+     * @brief Activate the MST algorithm on the given graph.
+     * @param g The graph to process.
+     * @return A string containing the result of the MST algorithm.
+     */
     std::string activate(Graph& g) override {
             if (!g.isConnected(g.adjMat)) {
                 return "Graph is not connected";
@@ -29,7 +34,11 @@ public:
 
       
     
-
+    /**
+     * @brief Calculate the minimum spanning tree (MST) of the given graph.
+     * @param g The graph to process.
+     * @return The weight of the MST.
+     */
     int culcMST(Graph &g);
     
 };

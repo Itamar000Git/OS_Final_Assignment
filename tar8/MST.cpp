@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <iostream>
 
+
+
 struct Edge {
     int u, v, w;
     bool operator<(const Edge& other) const {
@@ -55,7 +57,7 @@ int MST::culcMST(Graph &graph) {
         }
     }
     if (edges_used != n - 1) {
-        std::cerr << "Graph is not connected, MST does not exist\n";
+       // std::cerr << "Graph is not connected, MST does not exist\n";
         return -1;
     }
     return mst_weight;
