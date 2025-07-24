@@ -33,6 +33,7 @@ struct Task {
     std::vector<std::vector<int>> matrix;
     std::string results = "";
 };
+std::mutex coutMutex;
 
 // Global variables for Leader-Follower
 std::queue<Task> mst_task_Q,maxFlow_task_Q,pathCover_task_Q,scc_task_Q; // Queue to hold tasks
@@ -65,8 +66,9 @@ void MST_worker() {
         {
             std::lock_guard<std::mutex> lock(maxFlowQueueMutex);
             maxFlow_task_Q.push({task.client_socket, task.matrix, task.results});
+            maxFlowCV.notify_one();
         }
-        maxFlowCV.notify_one();
+ 
 
     }
 }
@@ -93,8 +95,9 @@ void MaxFlow_worker() {
         {
             std::lock_guard<std::mutex> lock(pathCoverQueueMutex);
             pathCover_task_Q.push({task.client_socket, task.matrix, task.results});
+            pathCoverCV.notify_one();
         }
-        pathCoverCV.notify_one();
+       
 
     }
 }
@@ -123,8 +126,9 @@ void PathCover_worker() {
         {
             std::lock_guard<std::mutex> lock(sccQueueMutex);
             scc_task_Q.push({task.client_socket, task.matrix, task.results});
+            sccCV.notify_one();
         }
-        sccCV.notify_one();
+        
 
     }
         
@@ -158,6 +162,7 @@ void SCC_worker() {
         }
         
        // close(task.client_socket);
+
         std::cout << "Task completed and sent to client" << std::endl;
     }
 }
@@ -226,8 +231,10 @@ void run_server(int port_tcp, Graph& g) {
     if (listen(server_fd, 10) < 0) {// Listen for incoming connections
         throw std::runtime_error("listen failed");
     }
-    std::cout << "Server listening over tcp on port " << port_tcp << std::endl;
-
+    
+      
+        std::cout << "Server listening over tcp on port " << port_tcp << std::endl;
+    
 
     while (true) {// Main loop for handling connections and commands
         FD_ZERO(&readfds);
@@ -342,8 +349,9 @@ void run_server(int port_tcp, Graph& g) {
                     {
                         std::lock_guard<std::mutex> lock(mstQueueMutex);
                         mst_task_Q.push({sd, newMatrix});
+                        mstCV.notify_one();
                     }
-                    mstCV.notify_one();
+                   
 
                     std::cout << "Task added to queue for processing" << std::endl;
                 } else {
@@ -356,10 +364,22 @@ void run_server(int port_tcp, Graph& g) {
 
     // Cleanup - signal workers to stop and wait for them
     serverRunning = false;
+    {
+    std::lock_guard<std::mutex> lock(mstQueueMutex);
     mstCV.notify_all();
+    }
+    {
+    std::lock_guard<std::mutex> lock(maxFlowQueueMutex);
     maxFlowCV.notify_all();
+    }
+    {
+    std::lock_guard<std::mutex> lock(pathCoverQueueMutex);
     pathCoverCV.notify_all();
+    }
+    {
+    std::lock_guard<std::mutex> lock(sccQueueMutex);
     sccCV.notify_all();
+    }
     for (auto& worker : workers) {
         worker.join();
     }

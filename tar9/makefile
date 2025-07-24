@@ -10,6 +10,8 @@ HEADERS = Graph.hpp ../tar8/Algorithms.hpp ../tar8/Strategy.hpp ../tar8/Factory.
 
 VALGRIND_MEMCHECK = valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all
 VALGRIND_CALLGRIND = valgrind --tool=callgrind
+VALGRIND_HELGRIND = valgrind --tool=helgrind ./server -T 9999
+
 
 all: $(TARGET1) $(TARGET2)
 
@@ -46,3 +48,13 @@ coverage: $(TARGET1) $(TARGET2)
 	mkdir -p $(COVERAGE_DIR)
 	mv *.gcda *.gcno *.gcov $(COVERAGE_DIR) 2>/dev/null || true
 	mv ../tar8/*.gcda ../tar8/*.gcno ../tar8/*.gcov $(COVERAGE_DIR) 2>/dev/null || true
+
+valgrind-memcheck: $(TARGET1)
+	valgrind $(VALGRIND_MEMCHECK) ./$(TARGET1) -T 9999
+
+valgrind-callgrind: $(TARGET1)
+	valgrind $(VALGRIND_CALLGRIND) ./$(TARGET1) -T 9999
+
+valgrind-helgrind: $(TARGET1)
+	valgrind $(VALGRIND_HELGRIND) ./$(TARGET1) -T 9999
+
