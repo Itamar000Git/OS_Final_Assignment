@@ -1,6 +1,6 @@
- 
+	
 C = g++
-CFLAGS = -c -g -Wall --coverage
+CFLAGS = -c -g -Wall --coverage -pthread
 COVERAGE_DIR = coverage_files
 OBJECTS1 = Graph.o MST.o MaxFlow.o PathCover.o SCC.o
 OBJECTS2 = client.o
@@ -14,7 +14,7 @@ VALGRIND_CALLGRIND = valgrind --tool=callgrind
 all: $(TARGET1) $(TARGET2)
 
 $(TARGET1): $(OBJECTS1)
-	$(C) -o $(TARGET1) $(OBJECTS1) -g --coverage
+	$(C) -o $(TARGET1) $(OBJECTS1) -g --coverage -pthread
 
 $(TARGET2): $(OBJECTS2)
 	$(C) -o $(TARGET2) $(OBJECTS2) -g --coverage

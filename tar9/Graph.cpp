@@ -15,10 +15,13 @@
 #include <condition_variable>
 #include <queue>
 #include <atomic>
-#include "Algorithms.hpp"
-#include "MST.hpp"
-#include "Strategy.hpp"
-#include "Factory.hpp"
+#include "../tar8/Algorithms.hpp"
+#include "../tar8/MST.hpp"
+#include "../tar8/Strategy.hpp"
+#include "../tar8/Factory.hpp"
+#include "../tar8/MaxFlow.hpp"
+#include "../tar8/PathCover.hpp"
+#include "../tar8/SCC.hpp"
 #include <random>
 #include <chrono>   
 
@@ -28,71 +31,137 @@ Graph::Graph() : vertices(0), EdgesNum(0) {}
 struct Task {
     int client_socket;
     std::vector<std::vector<int>> matrix;
+    std::string results = "";
 };
 
 // Global variables for Leader-Follower
-std::queue<Task> taskQueue; // Queue to hold tasks
-std::mutex queueMutex; // Mutex for thread-safe access to the queue
-std::condition_variable queueCV; // Condition variable to notify workers
+std::queue<Task> mst_task_Q,maxFlow_task_Q,pathCover_task_Q,scc_task_Q; // Queue to hold tasks
+std::mutex mstQueueMutex,maxFlowQueueMutex,pathCoverQueueMutex,sccQueueMutex; // Mutex for thread-safe access to the queue
+std::condition_variable mstCV,maxFlowCV,pathCoverCV,sccCV; // Condition variable to notify workers
+
 std::atomic<bool> serverRunning{true}; // Flag to control server running state
 
+Graph g;
 // Worker function that runs 4 algorithms and sends results back
-void workerFunction() {
+void MST_worker() {
     while (serverRunning) {
-        std::unique_lock<std::mutex> lock(queueMutex);
-        queueCV.wait(lock, []{ return !taskQueue.empty() || !serverRunning; });
-        
-        if (!serverRunning && taskQueue.empty()) break;
-        
-        Task task = taskQueue.front();
-        taskQueue.pop();
+        std::unique_lock<std::mutex> lock(mstQueueMutex);
+        mstCV.wait(lock, []{ return !mst_task_Q.empty() || !serverRunning; });
+
+        if (!serverRunning && mst_task_Q.empty()) break;
+        Task task = mst_task_Q.front();
+        mst_task_Q.pop();
         lock.unlock();
         
         // Process the task
-        Graph g;
         g.parseFromMatrix(task.matrix);
-        
-        // Run all 4 algorithms
-        std::string results = "";
-        
+    
         // MST
         Strategy mst_stra;
         Algorithms* mst_alg = AlgorithmFactory::createAlgorithm("MST");
         mst_stra.setStrategy(mst_alg);
-        results += "MST: " + mst_stra.execute(g) + "\n";
+        task.results += "MST: " + mst_stra.execute(g) + "\n";
         delete mst_alg;
-        
+        {
+            std::lock_guard<std::mutex> lock(maxFlowQueueMutex);
+            maxFlow_task_Q.push({task.client_socket, task.matrix, task.results});
+        }
+        maxFlowCV.notify_one();
+
+    }
+}
+void MaxFlow_worker() {
+    while (serverRunning) {
+        std::unique_lock<std::mutex> lock(maxFlowQueueMutex);
+        maxFlowCV.wait(lock, []{ return !maxFlow_task_Q.empty() || !serverRunning; });
+
+        if (!serverRunning && maxFlow_task_Q.empty()) break;
+
+        Task task = maxFlow_task_Q.front();
+        maxFlow_task_Q.pop();
+        lock.unlock();
+
+        // Process the task
+        g.parseFromMatrix(task.matrix);
         // MaxFlow
         Strategy maxFlow_stra;
         Algorithms* maxFlow_alg = AlgorithmFactory::createAlgorithm("MaxFlow");
         maxFlow_stra.setStrategy(maxFlow_alg);
-        results += "MaxFlow: " + maxFlow_stra.execute(g) + "\n";
+        task.results += "MaxFlow: " + maxFlow_stra.execute(g) + "\n";
         delete maxFlow_alg;
-        
+
+        {
+            std::lock_guard<std::mutex> lock(pathCoverQueueMutex);
+            pathCover_task_Q.push({task.client_socket, task.matrix, task.results});
+        }
+        pathCoverCV.notify_one();
+
+    }
+}
+
+void PathCover_worker() {
+    while (serverRunning) {
+        std::unique_lock<std::mutex> lock(pathCoverQueueMutex);
+        pathCoverCV.wait(lock, []{ return !pathCover_task_Q.empty() || !serverRunning; });
+
+        if (!serverRunning && pathCover_task_Q.empty()) break;
+
+        Task task = pathCover_task_Q.front();
+        pathCover_task_Q.pop();
+        lock.unlock();
+
+        // Process the task
+        g.parseFromMatrix(task.matrix);
+
         // PathCover
         Strategy pathCover_stra;
         Algorithms* pathCover_alg = AlgorithmFactory::createAlgorithm("PathCover");
         pathCover_stra.setStrategy(pathCover_alg);
-        results += "PathCover: " + pathCover_stra.execute(g) + "\n";
+        task.results += "PathCover: " + pathCover_stra.execute(g) + "\n";
         delete pathCover_alg;
+        
+        {
+            std::lock_guard<std::mutex> lock(sccQueueMutex);
+            scc_task_Q.push({task.client_socket, task.matrix, task.results});
+        }
+        sccCV.notify_one();
+
+    }
+        
+}
+
+void SCC_worker() {
+    while (serverRunning) {
+        std::unique_lock<std::mutex> lock(sccQueueMutex);
+        sccCV.wait(lock, []{ return !scc_task_Q.empty() || !serverRunning; });
+
+        if (!serverRunning && scc_task_Q.empty()) break;
+
+        Task task = scc_task_Q.front();
+        scc_task_Q.pop();
+        lock.unlock();
+
+        // Process the task
+        g.parseFromMatrix(task.matrix);
         
         // SCC
         Strategy scc_stra;
         Algorithms* scc_alg = AlgorithmFactory::createAlgorithm("SCC");
         scc_stra.setStrategy(scc_alg);
-        results += "SCC: " + scc_stra.execute(g) + "\n";
+        task.results += "SCC: " + scc_stra.execute(g) + "\n";
         delete scc_alg;
         
         // Send results back to client
-        int result_len = results.size();
+        int result_len = task.results.size();
         if (send(task.client_socket, &result_len, sizeof(result_len), 0) >= 0) {
-            send(task.client_socket, results.c_str(), result_len, 0);
+            send(task.client_socket, task.results.c_str(), result_len, 0);
         }
         
        // close(task.client_socket);
         std::cout << "Task completed and sent to client" << std::endl;
     }
 }
+
 
 void CreateRandomGraph(size_t v_num, size_t e_num, Graph& g, int max_weight = 20) {
     std::cout << "Creating random graph with " << v_num << " vertices and " << e_num << " edges." << std::endl;
@@ -102,7 +171,7 @@ void CreateRandomGraph(size_t v_num, size_t e_num, Graph& g, int max_weight = 20
 
     std::vector<std::pair<int, int>> allEdges;
     for (size_t u = 0; u < v_num; ++u) {
-        for (size_t v =0; v < v_num; ++v) {
+        for (size_t v = 0; v < v_num; ++v) {
             allEdges.emplace_back(u, v);
         }
     }
@@ -129,12 +198,13 @@ void run_server(int port_tcp, Graph& g) {
     struct sockaddr_in address;
     fd_set readfds;
 
-    // Create worker threads (followers)
-    const int NUM_WORKERS = 4; // Number of worker threads
+
     std::vector<std::thread> workers; // Create worker threads
-    for (int i = 0; i < NUM_WORKERS; ++i) {
-        workers.emplace_back(workerFunction);
-    }
+ 
+    workers.emplace_back(MST_worker);
+    workers.emplace_back(MaxFlow_worker);
+    workers.emplace_back(PathCover_worker);
+    workers.emplace_back(SCC_worker);
 
     // Create a TCP socket
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
@@ -270,11 +340,11 @@ void run_server(int port_tcp, Graph& g) {
                 if (success) {
                     std::cout << "Received adjacency matrix of size " << n << "x" << n << "\n";
                     {
-                        std::lock_guard<std::mutex> lock(queueMutex);
-                        taskQueue.push({sd, newMatrix});
+                        std::lock_guard<std::mutex> lock(mstQueueMutex);
+                        mst_task_Q.push({sd, newMatrix});
                     }
-                    queueCV.notify_one();
-                
+                    mstCV.notify_one();
+
                     std::cout << "Task added to queue for processing" << std::endl;
                 } else {
                     close(sd);
@@ -286,7 +356,10 @@ void run_server(int port_tcp, Graph& g) {
 
     // Cleanup - signal workers to stop and wait for them
     serverRunning = false;
-    queueCV.notify_all();
+    mstCV.notify_all();
+    maxFlowCV.notify_all();
+    pathCoverCV.notify_all();
+    sccCV.notify_all();
     for (auto& worker : workers) {
         worker.join();
     }
@@ -401,7 +474,7 @@ void Graph::parseFromMatrix(const std::vector<std::vector<int>>& matrix) {
     this->adjMat = matrix;
     for(int i = 0; i < vertices; ++i) {
         for (int j = 0; j < vertices; ++j) {
-            if (matrix[i][j] == 1) {
+            if (matrix[i][j] >= 1) {
                 EdgesNum++;
             }
         }
