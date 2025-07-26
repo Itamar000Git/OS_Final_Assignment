@@ -1,6 +1,6 @@
  
 C = g++
-CFLAGS = -c -g -Wall --coverage
+CFLAGS = -c -g -Wall --coverage -pg
 COVERAGE_DIR = coverage_files
 OBJECTS1 = main.o Graph.o
 TARGET1 = main
@@ -11,7 +11,7 @@ VALGRIND_CALLGRIND = valgrind --tool=callgrind
 all: $(TARGET1)
 
 $(TARGET1): $(OBJECTS1)
-	$(C) -o $(TARGET1) $(OBJECTS1) -g --coverage
+	$(C) -o $(TARGET1) $(OBJECTS1) -pg -g --coverage
 
 main.o: main.cpp Graph.hpp
 	$(C) $(CFLAGS) main.cpp -o main.o
