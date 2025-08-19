@@ -12,7 +12,6 @@ VALGRIND_MEMCHECK = valgrind --tool=memcheck --leak-check=full --show-leak-kinds
 VALGRIND_CALLGRIND = valgrind --tool=callgrind
 VALGRIND_HELGRIND = valgrind --tool=helgrind ./server -T 9999
 
-
 all: $(TARGET1) $(TARGET2)
 
 $(TARGET1): $(OBJECTS1)
